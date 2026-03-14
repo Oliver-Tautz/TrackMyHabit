@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/tracker.dart';
 import '../models/field.dart';
 import '../models/entry.dart';
+import '../services/storage_service.dart';
 
 class InputScreen extends StatefulWidget {
   final Tracker tracker;
@@ -15,6 +16,7 @@ class InputScreen extends StatefulWidget {
 class _InputScreenState extends State<InputScreen> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
+  final _storage = StorageService();
   DateTime _selectedDateTime = DateTime.now();
 
   @override
@@ -204,8 +206,8 @@ class _InputScreenState extends State<InputScreen> {
         values: values,
       );
 
-      // TODO: Save to storage service
-      print('Entry saved: ${entry.values}');
+      // Save to storage service
+      _storage.addEntry(entry);
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -215,8 +217,8 @@ class _InputScreenState extends State<InputScreen> {
         ),
       );
 
-      // Go back to home screen
-      Navigator.pop(context);
+      // Go back to previous screen
+      Navigator.pop(context, true); // Return true to indicate success
     }
   }
 }

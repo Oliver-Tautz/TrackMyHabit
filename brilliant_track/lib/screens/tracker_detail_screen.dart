@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/tracker.dart';
 import '../models/entry.dart';
+import '../services/storage_service.dart';
 import 'input_screen.dart';
 
 class TrackerDetailScreen extends StatefulWidget {
@@ -18,6 +19,8 @@ class TrackerDetailScreen extends StatefulWidget {
 }
 
 class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
+  final _storage = StorageService();
+
   @override
   Widget build(BuildContext context) {
     // Sort entries by date (newest first)
@@ -300,11 +303,11 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Delete from storage
-              setState(() {
-                widget.entries.remove(entry);
-              });
+              // Delete from storage
+              _storage.deleteEntry(entry);
+              widget.entries.remove(entry);
               Navigator.pop(context);
+              setState(() {});
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Entry deleted'),

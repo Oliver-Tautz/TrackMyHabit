@@ -127,7 +127,7 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
 
               // Frequency dropdown
               DropdownButtonFormField<Frequency>(
-                value: _selectedFrequency,
+                initialValue: _selectedFrequency,
                 decoration: const InputDecoration(
                   labelText: 'Frequency',
                   border: OutlineInputBorder(),
@@ -334,7 +334,7 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<FieldType>(
-            value: _selectedType,
+            initialValue: _selectedType,
             decoration: const InputDecoration(
               labelText: 'Field Type',
               border: OutlineInputBorder(),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/tracker.dart';
 import '../models/field.dart';
 import '../models/entry.dart';
+import '../services/storage_service.dart';
 import 'input_screen.dart';
 import 'create_tracker_screen.dart';
 import 'tracker_detail_screen.dart';
@@ -14,22 +15,58 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Sample data - in real app, this would come from storage
-  List<Tracker> trackers = [
-    Tracker(
-      id: '1',
-      name: 'Weight Tracker',
-      question: 'What is your weight today?',
-      fields: [
-        Field(name: 'Weight', type: FieldType.float),
-        Field(name: 'Body Fat %', type: FieldType.float),
-      ],
-      schedule: Schedule(frequency: Frequency.daily, time: '08:00'),
-    ),
-  ];
+  final _storage = StorageService();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeSampleData();
+  }
+
+  void _initializeSampleData() {
+    // Add sample tracker if storage is empty
+    if (_storage.getAllTrackers().isEmpty) {
+      final sampleTracker = Tracker(
+        id: '1',
+        name: 'Weight Tracker',
+        question: 'What is your weight today?',
+        fields: [
+          Field(name: 'Weight', type: FieldType.float),
+          Field(name: 'Body Fat %', type: FieldType.float),
+        ],
+        schedule: Schedule(frequency: Frequency.daily, time: '08:00'),
+      );
+      _storage.addTracker(sampleTracker);
+
+      // Add some sample entries
+      final now = DateTime.now();
+      _storage.addEntry(
+        Entry(
+          trackerId: '1',
+          timestamp: now,
+          values: {'Weight': 70.5, 'Body Fat %': 18.2},
+        ),
+      );
+      _storage.addEntry(
+        Entry(
+          trackerId: '1',
+          timestamp: now.subtract(const Duration(days: 1)),
+          values: {'Weight': 70.8, 'Body Fat %': 18.5},
+        ),
+      );
+      _storage.addEntry(
+        Entry(
+          trackerId: '1',
+          timestamp: now.subtract(const Duration(days: 2)),
+          values: {'Weight': 71.0, 'Body Fat %': 18.7},
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final trackers = _storage.getAllTrackers();
     return Scaffold(
       appBar: AppBar(
         title: const Text('brilliant.track'),
@@ -125,52 +162,26 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => InputScreen(tracker: tracker)),
-    );
+    ).then((_) {
+      // Refresh the screen after adding entry
+      setState(() {});
+    });
   }
 
   void _viewTrackerDetails(Tracker tracker) {
-    // Generate sample entries for demo
-    final sampleEntries = _getSampleEntries(tracker);
+    // Get real entries from storage
+    final entries = _storage.getEntriesForTracker(tracker.id);
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) =>
-            TrackerDetailScreen(tracker: tracker, entries: sampleEntries),
+            TrackerDetailScreen(tracker: tracker, entries: entries),
       ),
-    );
-  }
-
-  List<Entry> _getSampleEntries(Tracker tracker) {
-    // Create some sample entries for demonstration
-    final now = DateTime.now();
-    return [
-      Entry(
-        trackerId: tracker.id,
-        timestamp: now,
-        values: {'Weight': 70.5, 'Body Fat %': 18.2},
-      ),
-      Entry(
-        trackerId: tracker.id,
-        timestamp: now.subtract(const Duration(days: 1)),
-        values: {'Weight': 70.8, 'Body Fat %': 18.5},
-      ),
-      Entry(
-        trackerId: tracker.id,
-        timestamp: now.subtract(const Duration(days: 2)),
-        values: {'Weight': 71.0, 'Body Fat %': 18.7},
-      ),
-      Entry(
-        trackerId: tracker.id,
-        timestamp: now.subtract(const Duration(days: 3)),
-        values: {'Weight': 71.2, 'Body Fat %': 19.0},
-      ),
-      Entry(
-        trackerId: tracker.id,
-        timestamp: now.subtract(const Duration(days: 7)),
-        values: {'Weight': 72.0, 'Body Fat %': 19.5},
-      ),
-    ];
+    ).then((_) {
+      // Refresh the screen when returning
+      setState(() {});
+    });
   }
 
   void _createNewTracker() {
@@ -179,9 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(builder: (context) => const CreateTrackerScreen()),
     ).then((newTracker) {
       if (newTracker != null && newTracker is Tracker) {
-        setState(() {
-          trackers.add(newTracker);
-        });
+        _storage.addTracker(newTracker);
+        setState(() {});
       }
     });
   }
