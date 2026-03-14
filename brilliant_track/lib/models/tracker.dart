@@ -31,6 +31,7 @@ class Tracker {
   final List<Field> fields;
   final Schedule schedule;
   final IconData? icon;
+  final bool notificationsEnabled;
 
   Tracker({
     required this.id,
@@ -39,5 +40,6 @@ class Tracker {
     required this.fields,
     required this.schedule,
     this.icon,
+    this.notificationsEnabled = true,
   });
 }

@@ -1,4 +1,5 @@
 import '../models/tracker.dart';
+import 'notification_service.dart';
 import '../models/entry.dart';
 
 /// Simple in-memory storage service for trackers and entries
@@ -26,12 +27,22 @@ class StorageService {
 
   void addTracker(Tracker tracker) {
     _trackers.add(tracker);
+    // schedule notification for this tracker if possible
+    try {
+      final ns = NotificationService();
+      ns.scheduleForTracker(tracker);
+    } catch (_) {}
   }
 
   void updateTracker(Tracker tracker) {
     final index = _trackers.indexWhere((t) => t.id == tracker.id);
     if (index != -1) {
       _trackers[index] = tracker;
+      try {
+        final ns = NotificationService();
+        ns.cancelForTrackerId(tracker.id);
+        ns.scheduleForTracker(tracker);
+      } catch (_) {}
     }
   }
 
@@ -39,6 +50,10 @@ class StorageService {
     _trackers.removeWhere((t) => t.id == id);
     // Also delete all entries for this tracker
     _entries.removeWhere((e) => e.trackerId == id);
+    try {
+      final ns = NotificationService();
+      ns.cancelForTrackerId(id);
+    } catch (_) {}
   }
 
   // Entries

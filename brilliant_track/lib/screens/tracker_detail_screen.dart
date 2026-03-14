@@ -4,6 +4,7 @@ import '../models/entry.dart';
 import '../services/storage_service.dart';
 import 'input_screen.dart';
 import 'create_tracker_screen.dart';
+import '../services/notification_service.dart';
 
 class TrackerDetailScreen extends StatefulWidget {
   final Tracker tracker;
@@ -48,6 +49,21 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
             icon: const Icon(Icons.edit),
             onPressed: _editTracker,
             tooltip: 'Edit Tracker',
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_active),
+            onPressed: _testNotification,
+            tooltip: 'Test Notification',
+          ),
+          // Notification toggle
+          IconButton(
+            icon: Icon(
+              widget.tracker.notificationsEnabled
+                  ? Icons.notifications
+                  : Icons.notifications_off,
+            ),
+            onPressed: _toggleNotifications,
+            tooltip: 'Toggle Notifications',
           ),
         ],
       ),
@@ -357,5 +373,56 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
         }
       }
     });
+  }
+
+  void _testNotification() async {
+    try {
+      final ns = NotificationService();
+      final id = await ns.scheduleForTracker(widget.tracker);
+      if (id != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Test notification scheduled')),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notifications not supported on this platform'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to schedule: $e')));
+      }
+    }
+  }
+
+  void _toggleNotifications() {
+    // Toggle notifications flag on tracker and update storage
+    final updated = Tracker(
+      id: widget.tracker.id,
+      name: widget.tracker.name,
+      question: widget.tracker.question,
+      fields: widget.tracker.fields,
+      schedule: widget.tracker.schedule,
+      icon: widget.tracker.icon,
+      notificationsEnabled: !widget.tracker.notificationsEnabled,
+    );
+
+    _storage.updateTracker(updated);
+    setState(() {});
+    if (!updated.notificationsEnabled) {
+      try {
+        final ns = NotificationService();
+        ns.cancelForTrackerId(updated.id);
+      } catch (_) {}
+    } else {
+      try {
+        final ns = NotificationService();
+        ns.scheduleForTracker(updated);
+      } catch (_) {}
+    }
   }
 }
