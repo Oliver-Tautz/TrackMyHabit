@@ -2,46 +2,82 @@
 
 Small app to get daily notifications and track stats.
 
-## Problems / Fixes
+---
 
-1.  **JDK 17 not installed**
+# Setup Problems / Fixes
 
-    ``` bash
-    sudo pacman -S jdk17-openjdk
-    ```
+## 1. JDK 17 not installed
 
-2.  **Flutter not using JDK 17**
+Install the required JDK:
 
-    ``` bash
-    flutter config --jdk-dir=/usr/lib/jvm/java-17-openjdk
-    ```
+```bash
+sudo pacman -S jdk17-openjdk
+```
 
-3.  **Flutter tool Gradle cache is in an inaccessible system folder**
-    Fix permissions for Flutter's internal Gradle cache directory:
+---
 
-    ``` bash
-    sudo mkdir -p /usr/lib/flutter/packages/flutter_tools/gradle/.gradle
-    sudo chown -R "$USER":"$USER" /usr/lib/flutter/packages/flutter_tools/gradle/.gradle
-    ```
+## 2. Flutter not using JDK 17
 
-    Optional: reset the broken Kotlin cache/sessions:
+Configure Flutter to use the correct JDK:
 
-    ``` bash
-    rm -rf /usr/lib/flutter/packages/flutter_tools/gradle/.gradle/kotlin
-    ```
+```bash
+flutter config --jdk-dir=/usr/lib/jvm/java-17-openjdk
+```
 
-4.  **Android emulator fails on Wayland (Qt wayland plugin missing in
-    SDK emulator)** Workaround: run emulator through XWayland (`xcb`)
-    and disable Vulkan:
 
-    ``` bash
-    export QT_QPA_PLATFORM=xcb
-    $ANDROID_SDK_ROOT/emulator/emulator -avd Pixel_2 -feature -Vulkan
-    ```
+## 4. Android emulator fails on Wayland  
+(Qt Wayland plugin missing in SDK emulator)
 
-    If Qt complains about missing xcb cursor library:
+Workaround: run the emulator through **XWayland (`xcb`)** and disable **Vulkan**.
 
-    ``` bash
-    sudo pacman -S xcb-util-cursor
-    ```
-5.  Start with `flutter run` in hello_world 
+```bash
+export QT_QPA_PLATFORM=xcb
+$ANDROID_SDK_ROOT/emulator/emulator -avd Pixel_2 -feature -Vulkan
+```
+
+If Qt complains about a missing **xcb cursor library**:
+
+```bash
+sudo pacman -S xcb-util-cursor
+```
+
+---
+
+## 5. Gradle version
+
+Ensure the following line exists in:
+
+```
+hello_world/android/gradle/wrapper/gradle-wrapper.properties
+```
+
+```
+distributionUrl=https://services.gradle.org/distributions/gradle-8.7-all.zip
+```
+
+---
+
+## 6. Flutter installed via AUR (permission issue)
+
+```bash
+sudo chown -R "$USER:$USER" /usr/lib/flutter/packages/flutter_tools/gradle
+```
+
+This was a problem because Flutter was installed via AUR as **root**.  
+I still prefer this setup because **updates work through pacman**.
+
+---
+
+# Running the App
+
+Start the app from the project directory:
+
+```bash
+flutter run
+```
+
+Inside:
+
+```
+hello_world
+```
