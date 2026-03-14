@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter_native_timezone/flutter_native_timezone.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 import '../models/tracker.dart';
 
@@ -23,7 +23,7 @@ class NotificationService {
     // Initialize timezone data
     tz.initializeTimeZones();
     try {
-      final String tzName = await FlutterNativeTimezone.getLocalTimezone();
+      final String tzName = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(tzName));
     } catch (e) {
       tz.setLocalLocation(tz.local);
@@ -65,8 +65,9 @@ class NotificationService {
         hour,
         minute,
       );
-      if (scheduled.isBefore(now))
+      if (scheduled.isBefore(now)) {
         scheduled = scheduled.add(const Duration(days: 1));
+      }
 
       await _plugin.zonedSchedule(
         id: id,
@@ -96,10 +97,12 @@ class NotificationService {
         hour,
         minute,
       );
-      while (scheduled.weekday != target)
+      while (scheduled.weekday != target) {
         scheduled = scheduled.add(const Duration(days: 1));
-      if (scheduled.isBefore(now))
+      }
+      if (scheduled.isBefore(now)) {
         scheduled = scheduled.add(const Duration(days: 7));
+      }
 
       await _plugin.zonedSchedule(
         id: id,

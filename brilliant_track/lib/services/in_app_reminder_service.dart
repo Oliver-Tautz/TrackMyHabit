@@ -42,14 +42,16 @@ class InAppReminderService {
       } else if (sched.frequency == Frequency.weekly && sched.weekday != null) {
         if (now.weekday == sched.weekday &&
             now.hour == hour &&
-            now.minute == minute)
+            now.minute == minute) {
           _showReminder(t);
+        }
       } else if (sched.frequency == Frequency.monthly &&
           sched.dayOfMonth != null) {
         if (now.day == sched.dayOfMonth &&
             now.hour == hour &&
-            now.minute == minute)
+            now.minute == minute) {
           _showReminder(t);
+        }
       }
     }
   }

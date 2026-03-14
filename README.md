@@ -25,7 +25,7 @@ flutter config --jdk-dir=/usr/lib/jvm/java-17-openjdk
 ```
 
 
-## 4. Android emulator fails on Wayland  
+## 4. Android emulator fails on Wayland
 (Qt Wayland plugin missing in SDK emulator)
 
 Workaround: run the emulator through **XWayland (`xcb`)** and disable **Vulkan**.
@@ -63,7 +63,7 @@ distributionUrl=https://services.gradle.org/distributions/gradle-8.7-all.zip
 sudo chown -R "$USER:$USER" /usr/lib/flutter/packages/flutter_tools/gradle
 ```
 
-This was a problem because Flutter was installed via AUR as **root**.  
+This was a problem because Flutter was installed via AUR as **root**.
 I still prefer this setup because **updates work through pacman**.
 
 ---
