@@ -5,6 +5,7 @@ import '../services/storage_service.dart';
 import 'input_screen.dart';
 import 'create_tracker_screen.dart';
 import '../services/notification/notification_service.dart';
+import '../widgets/global_app_bar.dart';
 
 class TrackerDetailScreen extends StatefulWidget {
   final Tracker tracker;
@@ -30,7 +31,7 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: GlobalAppBar(
         title: Row(
           children: [
             CircleAvatar(
@@ -43,7 +44,7 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
             Text(widget.tracker.name),
           ],
         ),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        // GlobalAppBar handles backgroundColor itself; do not pass here.
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -55,12 +56,15 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
             onPressed: _testNotification,
             tooltip: 'Test Notification',
           ),
-          // Notification toggle
+          // Notification toggle (highlighted when enabled)
           IconButton(
             icon: Icon(
               widget.tracker.notificationsEnabled
                   ? Icons.notifications
                   : Icons.notifications_off,
+              color: widget.tracker.notificationsEnabled
+                  ? Theme.of(context).colorScheme.secondary
+                  : null,
             ),
             onPressed: _toggleNotifications,
             tooltip: 'Toggle Notifications',

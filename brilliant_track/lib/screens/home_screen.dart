@@ -6,6 +6,7 @@ import '../services/storage_service.dart';
 import 'input_screen.dart';
 import 'create_tracker_screen.dart';
 import 'tracker_detail_screen.dart';
+import '../widgets/global_app_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,9 +69,27 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final trackers = _storage.getAllTrackers();
     return Scaffold(
-      appBar: AppBar(
+      appBar: GlobalAppBar(
         title: const Text('brilliant.track'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          PopupMenuButton<int>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (c) => Scaffold(
+                    appBar: AppBar(title: const Text('Settings')),
+                    body: const Center(child: Text('Settings (mock)')),
+                  ),
+                ),
+              );
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 1, child: Text('Settings')),
+            ],
+          ),
+        ],
       ),
       body: trackers.isEmpty
           ? _buildEmptyState()
@@ -140,11 +159,31 @@ class _HomeScreenState extends State<HomeScreen> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Notification toggle shown in the list (highlighted when enabled)
             IconButton(
-              icon: const Icon(Icons.add_circle),
-              color: Theme.of(context).colorScheme.primary,
-              onPressed: () => _addEntry(tracker),
-              tooltip: 'Add entry',
+              icon: Icon(
+                tracker.notificationsEnabled
+                    ? Icons.notifications
+                    : Icons.notifications_off,
+              ),
+              color: tracker.notificationsEnabled
+                  ? Theme.of(context).colorScheme.secondary
+                  : Theme.of(context).colorScheme.primary,
+              onPressed: () {
+                // Toggle the tracker notifications
+                final updated = Tracker(
+                  id: tracker.id,
+                  name: tracker.name,
+                  question: tracker.question,
+                  fields: tracker.fields,
+                  schedule: tracker.schedule,
+                  icon: tracker.icon,
+                  notificationsEnabled: !tracker.notificationsEnabled,
+                );
+                _storage.updateTracker(updated);
+                setState(() {});
+              },
+              tooltip: 'Toggle Notifications',
             ),
             IconButton(
               icon: const Icon(Icons.edit),
