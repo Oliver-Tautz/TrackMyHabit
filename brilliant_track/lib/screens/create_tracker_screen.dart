@@ -355,6 +355,7 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
 
   Widget _buildWeekdaySelector() {
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // ignore: unused_local_variable
     int? selected = widget.initialTracker?.schedule.weekday;
     if (_selectedFrequency == Frequency.weekly && _selectedIcon != null) {
       // noop
@@ -364,6 +365,7 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
       spacing: 8,
       children: List.generate(7, (i) {
         final dayNumber = i + 1; // 1..7
+        // ignore: unused_local_variable
         final isSelected =
             (widget.initialTracker?.schedule.weekday == dayNumber) || (false);
         return ChoiceChip(

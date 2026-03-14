@@ -1,5 +1,5 @@
 import '../models/tracker.dart';
-import 'notification_service.dart';
+import 'notification/notification_service.dart';
 import '../models/entry.dart';
 
 /// Simple in-memory storage service for trackers and entries

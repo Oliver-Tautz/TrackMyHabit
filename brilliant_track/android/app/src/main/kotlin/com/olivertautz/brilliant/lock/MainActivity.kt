@@ -1,4 +1,4 @@
-package com.example.hello_world
+package com.olivertautz.brilliant.track
 
 import io.flutter.embedding.android.FlutterActivity
 

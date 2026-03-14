@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.olivertautz.brilliant.lock"
+    namespace = "com.olivertautz.brilliant.track"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.olivertautz.brilliant.lock"
+        applicationId = "com.olivertautz.brilliant.track"
         minSdk = flutter.minSdkVersion
         multiDexEnabled = true
         targetSdk = flutter.targetSdkVersion

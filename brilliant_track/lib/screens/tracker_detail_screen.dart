@@ -4,7 +4,7 @@ import '../models/entry.dart';
 import '../services/storage_service.dart';
 import 'input_screen.dart';
 import 'create_tracker_screen.dart';
-import '../services/notification_service.dart';
+import '../services/notification/notification_service.dart';
 
 class TrackerDetailScreen extends StatefulWidget {
   final Tracker tracker;
