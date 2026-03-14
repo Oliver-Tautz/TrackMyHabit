@@ -3,7 +3,10 @@ import '../models/tracker.dart';
 import '../models/field.dart';
 
 class CreateTrackerScreen extends StatefulWidget {
-  const CreateTrackerScreen({super.key});
+  // When provided, the screen operates in "edit" mode and will prefill values.
+  final Tracker? initialTracker;
+
+  const CreateTrackerScreen({super.key, this.initialTracker});
 
   @override
   State<CreateTrackerScreen> createState() => _CreateTrackerScreenState();
@@ -26,10 +29,32 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    final t = widget.initialTracker;
+    if (t != null) {
+      // Prefill form for edit
+      _nameController.text = t.name;
+      _questionController.text = t.question;
+      _selectedFrequency = t.schedule.frequency;
+      _timeController.text = t.schedule.time;
+      _fields.clear();
+      for (var f in t.fields) {
+        _fields.add(FieldData(name: f.name, type: f.type));
+      }
+      _selectedIcon = t.icon;
+    }
+  }
+
+  IconData? _selectedIcon;
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create New Tracker'),
+        title: Text(
+          widget.initialTracker == null ? 'Create New Tracker' : 'Edit Tracker',
+        ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: SingleChildScrollView(
@@ -74,6 +99,13 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+
+              // Icon picker
+              Text('Icon', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              _buildIconPicker(),
+
               const SizedBox(height: 24),
 
               // Fields section
@@ -148,25 +180,51 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
               const SizedBox(height: 16),
 
               // Time input
-              TextFormField(
-                controller: _timeController,
-                decoration: const InputDecoration(
-                  labelText: 'Time',
-                  hintText: '08:00',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.access_time),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a time';
+              ListTile(
+                leading: const Icon(Icons.access_time),
+                title: const Text('Time'),
+                subtitle: Text(_timeController.text),
+                trailing: const Icon(Icons.edit),
+                onTap: () async {
+                  final timeOfDay = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay(
+                      hour: int.parse(_timeController.text.split(':')[0]),
+                      minute: int.parse(_timeController.text.split(':')[1]),
+                    ),
+                  );
+                  if (timeOfDay != null) {
+                    setState(() {
+                      _timeController.text =
+                          '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}';
+                    });
                   }
-                  return null;
                 },
               ),
 
+              const SizedBox(height: 16),
+              // Frequency-specific selectors
+              if (_selectedFrequency == Frequency.weekly) ...[
+                Text(
+                  'Day of week',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                _buildWeekdaySelector(),
+                const SizedBox(height: 16),
+              ] else if (_selectedFrequency == Frequency.monthly) ...[
+                Text(
+                  'Day of month',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                _buildDayOfMonthSelector(),
+                const SizedBox(height: 16),
+              ],
+
               const SizedBox(height: 32),
 
-              // Create button
+              // Create/Save button
               ElevatedButton(
                 onPressed: _createTracker,
                 style: ElevatedButton.styleFrom(
@@ -174,9 +232,11 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text(
-                  'Create Tracker',
-                  style: TextStyle(fontSize: 18),
+                child: Text(
+                  widget.initialTracker == null
+                      ? 'Create Tracker'
+                      : 'Save Changes',
+                  style: const TextStyle(fontSize: 18),
                 ),
               ),
             ],
@@ -246,6 +306,93 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
     }
   }
 
+  Widget _buildIconPicker() {
+    // Choose 10 material icons to present as options
+    final icons = [
+      Icons.insights,
+      Icons.fitness_center,
+      Icons.fastfood,
+      Icons.nest_cam_wired_stand,
+      Icons.self_improvement,
+      Icons.water,
+      Icons.nightlight_round,
+      Icons.directions_run,
+      Icons.bedtime,
+      Icons.checkroom,
+    ];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: icons.map((ic) {
+        final selected = _selectedIcon == ic;
+        return GestureDetector(
+          onTap: () => setState(() => _selectedIcon = ic),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: selected
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : null,
+              borderRadius: BorderRadius.circular(8),
+              border: selected
+                  ? Border.all(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 2,
+                    )
+                  : null,
+            ),
+            child: Icon(
+              ic,
+              size: 32,
+              color: selected ? Theme.of(context).colorScheme.primary : null,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildWeekdaySelector() {
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    int? selected = widget.initialTracker?.schedule.weekday;
+    if (_selectedFrequency == Frequency.weekly && _selectedIcon != null) {
+      // noop
+    }
+
+    return Wrap(
+      spacing: 8,
+      children: List.generate(7, (i) {
+        final dayNumber = i + 1; // 1..7
+        final isSelected =
+            (widget.initialTracker?.schedule.weekday == dayNumber) || (false);
+        return ChoiceChip(
+          label: Text(days[i]),
+          selected: _selectedWeekday == dayNumber,
+          onSelected: (_) {
+            setState(() {
+              _selectedWeekday = dayNumber;
+            });
+          },
+        );
+      }),
+    );
+  }
+
+  Widget _buildDayOfMonthSelector() {
+    return DropdownButton<int>(
+      value: _selectedDayOfMonth,
+      items: List.generate(31, (i) => i + 1)
+          .map((d) => DropdownMenuItem(value: d, child: Text(d.toString())))
+          .toList(),
+      onChanged: (v) => setState(() => _selectedDayOfMonth = v),
+      hint: const Text('Select day'),
+    );
+  }
+
+  int? _selectedWeekday;
+  int? _selectedDayOfMonth;
+
   IconData _getFieldTypeIcon(FieldType type) {
     switch (type) {
       case FieldType.integer:
@@ -270,8 +417,12 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
         return;
       }
 
+      final id =
+          widget.initialTracker?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString();
+
       final tracker = Tracker(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: id,
         name: _nameController.text,
         question: _questionController.text,
         fields: _fields
@@ -280,7 +431,10 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
         schedule: Schedule(
           frequency: _selectedFrequency,
           time: _timeController.text,
+          weekday: _selectedWeekday,
+          dayOfMonth: _selectedDayOfMonth,
         ),
+        icon: _selectedIcon,
       );
 
       Navigator.pop(context, tracker);

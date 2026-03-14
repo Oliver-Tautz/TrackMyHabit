@@ -3,6 +3,7 @@ import '../models/tracker.dart';
 import '../models/entry.dart';
 import '../services/storage_service.dart';
 import 'input_screen.dart';
+import 'create_tracker_screen.dart';
 
 class TrackerDetailScreen extends StatefulWidget {
   final Tracker tracker;
@@ -29,7 +30,18 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.tracker.name),
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              child: widget.tracker.icon != null
+                  ? Icon(widget.tracker.icon, color: Colors.white)
+                  : const Icon(Icons.analytics, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Text(widget.tracker.name),
+          ],
+        ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           IconButton(
@@ -327,9 +339,23 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
   }
 
   void _editTracker() {
-    // TODO: Implement edit tracker
-    ScaffoldMessenger.of(
+    // Open the CreateTrackerScreen in edit mode and persist updates
+    Navigator.push(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Edit tracker (coming soon)')));
+      MaterialPageRoute(
+        builder: (context) =>
+            CreateTrackerScreen(initialTracker: widget.tracker),
+      ),
+    ).then((updatedTracker) {
+      if (updatedTracker != null && updatedTracker is Tracker) {
+        _storage.updateTracker(updatedTracker);
+        if (mounted) {
+          setState(() {});
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Tracker updated')));
+        }
+      }
+    });
   }
 }

@@ -117,7 +117,9 @@ class _HomeScreenState extends State<HomeScreen> {
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
           backgroundColor: Theme.of(context).colorScheme.primary,
-          child: const Icon(Icons.analytics, color: Colors.white),
+          child: tracker.icon != null
+              ? Icon(tracker.icon, color: Colors.white)
+              : const Icon(Icons.analytics, color: Colors.white),
         ),
         title: Text(
           tracker.name,
@@ -135,10 +137,22 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.add_circle),
-          color: Theme.of(context).colorScheme.primary,
-          onPressed: () => _addEntry(tracker),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.add_circle),
+              color: Theme.of(context).colorScheme.primary,
+              onPressed: () => _addEntry(tracker),
+              tooltip: 'Add entry',
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit),
+              color: Theme.of(context).colorScheme.primary,
+              onPressed: () => _editTracker(tracker),
+              tooltip: 'Edit Tracker',
+            ),
+          ],
         ),
         onTap: () => _viewTrackerDetails(tracker),
       ),
@@ -191,7 +205,26 @@ class _HomeScreenState extends State<HomeScreen> {
     ).then((newTracker) {
       if (newTracker != null && newTracker is Tracker) {
         _storage.addTracker(newTracker);
-        setState(() {});
+        if (mounted) setState(() {});
+      }
+    });
+  }
+
+  void _editTracker(Tracker tracker) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateTrackerScreen(initialTracker: tracker),
+      ),
+    ).then((updatedTracker) {
+      if (updatedTracker != null && updatedTracker is Tracker) {
+        _storage.updateTracker(updatedTracker);
+        if (mounted) {
+          setState(() {});
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Tracker updated')));
+        }
       }
     });
   }
