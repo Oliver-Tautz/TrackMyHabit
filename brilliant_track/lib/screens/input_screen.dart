@@ -6,8 +6,9 @@ import '../services/storage_service.dart';
 
 class InputScreen extends StatefulWidget {
   final Tracker tracker;
+  final Entry? existingEntry;
 
-  const InputScreen({super.key, required this.tracker});
+  const InputScreen({super.key, required this.tracker, this.existingEntry});
 
   @override
   State<InputScreen> createState() => _InputScreenState();
@@ -17,20 +18,34 @@ class _InputScreenState extends State<InputScreen> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
   final _storage = StorageService();
+
   DateTime _selectedDateTime = DateTime.now();
+
+  bool get isEditing => widget.existingEntry != null;
 
   @override
   void initState() {
     super.initState();
-    // Create a controller for each field
+
+    // If editing, use existing timestamp
+    if (isEditing) {
+      _selectedDateTime = widget.existingEntry!.timestamp;
+    }
+
+    // Create controllers and prefill values if editing
     for (var field in widget.tracker.fields) {
-      _controllers[field.name] = TextEditingController();
+      final controller = TextEditingController();
+
+      if (isEditing && widget.existingEntry!.values.containsKey(field.name)) {
+        controller.text = widget.existingEntry!.values[field.name].toString();
+      }
+
+      _controllers[field.name] = controller;
     }
   }
 
   @override
   void dispose() {
-    // Clean up controllers
     for (var controller in _controllers.values) {
       controller.dispose();
     }
@@ -41,7 +56,7 @@ class _InputScreenState extends State<InputScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.tracker.name),
+        title: Text(isEditing ? "Edit Entry" : widget.tracker.name),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: SingleChildScrollView(
@@ -51,7 +66,6 @@ class _InputScreenState extends State<InputScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Question card
               Card(
                 color: Theme.of(context).colorScheme.primaryContainer,
                 child: Padding(
@@ -63,14 +77,13 @@ class _InputScreenState extends State<InputScreen> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
 
-              // Input fields
               ...widget.tracker.fields.map((field) => _buildFieldInput(field)),
 
               const SizedBox(height: 24),
 
-              // Date/Time picker
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.calendar_today),
@@ -86,7 +99,6 @@ class _InputScreenState extends State<InputScreen> {
 
               const SizedBox(height: 32),
 
-              // Save button
               ElevatedButton(
                 onPressed: _saveEntry,
                 style: ElevatedButton.styleFrom(
@@ -94,7 +106,10 @@ class _InputScreenState extends State<InputScreen> {
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('Save Entry', style: TextStyle(fontSize: 18)),
+                child: Text(
+                  isEditing ? 'Update Entry' : 'Save Entry',
+                  style: const TextStyle(fontSize: 18),
+                ),
               ),
             ],
           ),
@@ -118,12 +133,14 @@ class _InputScreenState extends State<InputScreen> {
           if (value == null || value.isEmpty) {
             return 'Please enter ${field.name}';
           }
+
           if (field.type == FieldType.integer ||
               field.type == FieldType.float) {
             if (double.tryParse(value) == null) {
               return 'Please enter a valid number';
             }
           }
+
           return null;
         },
       ),
@@ -185,11 +202,11 @@ class _InputScreenState extends State<InputScreen> {
 
   void _saveEntry() {
     if (_formKey.currentState!.validate()) {
-      // Collect values from controllers
       final Map<String, dynamic> values = {};
+
       for (var field in widget.tracker.fields) {
         final value = _controllers[field.name]!.text;
-        // Convert to appropriate type
+
         if (field.type == FieldType.integer) {
           values[field.name] = int.parse(value);
         } else if (field.type == FieldType.float) {
@@ -199,26 +216,33 @@ class _InputScreenState extends State<InputScreen> {
         }
       }
 
-      // Create entry
       final entry = Entry(
+        id:
+            widget.existingEntry?.id ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
         trackerId: widget.tracker.id,
         timestamp: _selectedDateTime,
         values: values,
       );
 
-      // Save to storage service
-      _storage.addEntry(entry);
+      if (isEditing) {
+        _storage.updateEntry(entry);
+      } else {
+        _storage.addEntry(entry);
+      }
 
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Entry saved successfully!'),
+        SnackBar(
+          content: Text(
+            isEditing
+                ? 'Entry updated successfully!'
+                : 'Entry saved successfully!',
+          ),
           backgroundColor: Colors.green,
         ),
       );
 
-      // Go back to previous screen
-      Navigator.pop(context, true); // Return true to indicate success
+      Navigator.pop(context, true);
     }
   }
 }

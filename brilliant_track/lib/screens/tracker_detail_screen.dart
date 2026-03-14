@@ -23,65 +23,65 @@ class TrackerDetailScreen extends StatefulWidget {
 
 class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
   final _storage = StorageService();
+  late Tracker tracker;
+
+  @override
+  void initState() {
+    super.initState();
+    tracker = widget.tracker;
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Sort entries by date (newest first)
     final sortedEntries = List<Entry>.from(widget.entries)
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     return Scaffold(
       appBar: GlobalAppBar(
+        showHomeButton: false,
         title: Row(
           children: [
             CircleAvatar(
+              radius: 16,
               backgroundColor: Theme.of(context).colorScheme.primary,
-              child: widget.tracker.icon != null
-                  ? Icon(widget.tracker.icon, color: Colors.white)
-                  : const Icon(Icons.analytics, color: Colors.white),
+              child: tracker.icon != null
+                  ? Icon(tracker.icon, color: Colors.white, size: 18)
+                  : const Icon(Icons.analytics, color: Colors.white, size: 18),
             ),
-            const SizedBox(width: 12),
-            Text(widget.tracker.name),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                tracker.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
           ],
         ),
-        // GlobalAppBar handles backgroundColor itself; do not pass here.
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: _editTracker,
-            tooltip: 'Edit Tracker',
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_active),
-            onPressed: _testNotification,
-            tooltip: 'Test Notification',
-          ),
-          // Notification toggle (highlighted when enabled)
+          IconButton(icon: const Icon(Icons.edit), onPressed: _editTracker),
           IconButton(
             icon: Icon(
-              widget.tracker.notificationsEnabled
+              tracker.notificationsEnabled
                   ? Icons.notifications
                   : Icons.notifications_off,
-              color: widget.tracker.notificationsEnabled
-                  ? Theme.of(context).colorScheme.secondary
-                  : null,
             ),
             onPressed: _toggleNotifications,
-            tooltip: 'Toggle Notifications',
           ),
         ],
       ),
       body: Column(
         children: [
-          // Stats card
           _buildStatsCard(),
-
-          // Entries list
           Expanded(
             child: sortedEntries.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     itemCount: sortedEntries.length,
                     itemBuilder: (context, index) {
                       return _buildEntryCard(sortedEntries[index]);
@@ -98,8 +98,13 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     );
   }
 
+  // -----------------------------
+  // STATS CARD
+  // -----------------------------
+
   Widget _buildStatsCard() {
     final totalEntries = widget.entries.length;
+
     final lastEntry = widget.entries.isNotEmpty
         ? widget.entries.reduce(
             (a, b) => a.timestamp.isAfter(b.timestamp) ? a : b,
@@ -109,22 +114,27 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     return Card(
       margin: const EdgeInsets.all(16),
       color: Theme.of(context).colorScheme.primaryContainer,
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.tracker.question,
-              style: Theme.of(context).textTheme.titleLarge,
+            Center(
+              child: Text(
+                tracker.question,
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStatItem(
                   icon: Icons.analytics,
-                  label: 'Total Entries',
+                  label: 'Total',
                   value: totalEntries.toString(),
                 ),
                 _buildStatItem(
@@ -137,7 +147,7 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
                 _buildStatItem(
                   icon: Icons.repeat,
                   label: 'Frequency',
-                  value: _getFrequencyText(widget.tracker.schedule.frequency),
+                  value: _getFrequencyText(tracker.schedule.frequency),
                 ),
               ],
             ),
@@ -154,29 +164,33 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
   }) {
     return Column(
       children: [
-        Icon(icon, size: 32),
+        Icon(icon, size: 24),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[700])),
       ],
     );
   }
+
+  // -----------------------------
+  // EMPTY STATE
+  // -----------------------------
 
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.inbox, size: 100, color: Colors.grey[400]),
-          const SizedBox(height: 16),
+          Icon(Icons.inbox, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 12),
           Text(
             'No entries yet',
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'Tap the button below to add your first entry',
             style: TextStyle(color: Colors.grey[600]),
@@ -186,77 +200,134 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     );
   }
 
+  // -----------------------------
+  // ENTRY CARD
+  // -----------------------------
+
   Widget _buildEntryCard(Entry entry) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          child: const Icon(Icons.check, color: Colors.white),
-        ),
-        title: Text(
-          _formatDateTime(entry.timestamp),
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          _getEntrySummary(entry),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ...entry.values.entries.map((e) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          e.key,
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w500,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onLongPress: () => _showEntryOptions(entry),
+        child: ExpansionTile(
+          leading: CircleAvatar(
+            radius: 18,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            child: const Icon(Icons.check, color: Colors.white, size: 18),
+          ),
+          title: Text(
+            _formatDateTime(entry.timestamp),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          ),
+          subtitle: Text(
+            _getEntrySummary(entry),
+            style: const TextStyle(fontSize: 13),
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Column(
+                children: [
+                  ...entry.values.entries.map((e) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(e.key),
+                          Text(
+                            e.value.toString(),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                        ),
-                        Text(
-                          e.value.toString(),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const Divider(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => _editEntry(entry),
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edit'),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _deleteEntry(entry),
-                      icon: const Icon(Icons.delete),
-                      label: const Text('Delete'),
-                      style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    ),
-                  ],
-                ),
-              ],
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -----------------------------
+  // ENTRY OPTIONS
+  // -----------------------------
+
+  void _showEntryOptions(Entry entry) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Edit Entry'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editEntry(entry);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Delete Entry'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteEntry(entry);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _editEntry(Entry entry) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            InputScreen(tracker: tracker, existingEntry: entry),
+      ),
+    ).then((_) => setState(() {}));
+  }
+
+  Future<void> _deleteEntry(Entry entry) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Entry'),
+        content: const Text('Are you sure you want to delete this entry?'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          TextButton(
+            child: const Text('Delete'),
+            onPressed: () => Navigator.pop(context, true),
           ),
         ],
       ),
     );
+
+    if (confirm == true) {
+      _storage.deleteEntry(entry);
+
+      setState(() {
+        widget.entries.remove(entry);
+      });
+    }
   }
+
+  // -----------------------------
+  // HELPERS
+  // -----------------------------
 
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
@@ -267,25 +338,23 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 
-    if (difference.inDays == 0) {
-      return 'Today';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else {
-      return '${dateTime.month}/${dateTime.day}/${dateTime.year}';
-    }
+    if (difference.inDays == 0) return 'Today';
+    if (difference.inDays == 1) return 'Yesterday';
+    if (difference.inDays < 7) return '${difference.inDays} days ago';
+
+    return '${dateTime.month}/${dateTime.day}/${dateTime.year}';
   }
 
   String _getEntrySummary(Entry entry) {
     if (entry.values.isEmpty) return 'No data';
-    final firstValue = entry.values.entries.first;
+
+    final first = entry.values.entries.first;
+
     if (entry.values.length == 1) {
-      return '${firstValue.key}: ${firstValue.value}';
-    } else {
-      return '${firstValue.key}: ${firstValue.value} (+${entry.values.length - 1} more)';
+      return '${first.key}: ${first.value}';
     }
+
+    return '${first.key}: ${first.value} (+${entry.values.length - 1} more)';
   }
 
   String _getFrequencyText(Frequency frequency) {
@@ -301,127 +370,51 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     }
   }
 
+  // -----------------------------
+  // ACTIONS
+  // -----------------------------
+
   void _addEntry() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => InputScreen(tracker: widget.tracker),
-      ),
-    ).then((value) {
-      // TODO: Refresh entries from storage
-      setState(() {});
-    });
-  }
-
-  void _editEntry(Entry entry) {
-    // TODO: Implement edit entry
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Edit entry: ${_formatDateTime(entry.timestamp)}'),
-      ),
-    );
-  }
-
-  void _deleteEntry(Entry entry) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Entry'),
-        content: Text('Delete entry from ${_formatDateTime(entry.timestamp)}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // Delete from storage
-              _storage.deleteEntry(entry);
-              widget.entries.remove(entry);
-              Navigator.pop(context);
-              setState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Entry deleted'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+      MaterialPageRoute(builder: (context) => InputScreen(tracker: tracker)),
+    ).then((_) => setState(() {}));
   }
 
   void _editTracker() {
-    // Open the CreateTrackerScreen in edit mode and persist updates
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            CreateTrackerScreen(initialTracker: widget.tracker),
+        builder: (context) => CreateTrackerScreen(initialTracker: tracker),
       ),
-    ).then((updatedTracker) {
-      if (updatedTracker != null && updatedTracker is Tracker) {
-        _storage.updateTracker(updatedTracker);
-        if (mounted) {
-          setState(() {});
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Tracker updated')));
-        }
+    ).then((updated) {
+      if (updated != null && updated is Tracker) {
+        _storage.updateTracker(updated);
+        setState(() => tracker = updated);
       }
     });
   }
 
-  void _testNotification() async {
-    try {
-      final ns = NotificationService();
-      // Show an immediate notification for testing
-      await ns.showNowForTracker(widget.tracker);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Test notification shown')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to show: $e')));
-      }
-    }
-  }
-
   void _toggleNotifications() {
-    // Toggle notifications flag on tracker and update storage
     final updated = Tracker(
-      id: widget.tracker.id,
-      name: widget.tracker.name,
-      question: widget.tracker.question,
-      fields: widget.tracker.fields,
-      schedule: widget.tracker.schedule,
-      icon: widget.tracker.icon,
-      notificationsEnabled: !widget.tracker.notificationsEnabled,
+      id: tracker.id,
+      name: tracker.name,
+      question: tracker.question,
+      fields: tracker.fields,
+      schedule: tracker.schedule,
+      icon: tracker.icon,
+      notificationsEnabled: !tracker.notificationsEnabled,
     );
 
     _storage.updateTracker(updated);
-    setState(() {});
+    setState(() => tracker = updated);
+
+    final ns = NotificationService();
+
     if (!updated.notificationsEnabled) {
-      try {
-        final ns = NotificationService();
-        ns.cancelForTrackerId(updated.id);
-      } catch (_) {}
+      ns.cancelForTrackerId(updated.id);
     } else {
-      try {
-        final ns = NotificationService();
-        ns.scheduleForTracker(updated);
-      } catch (_) {}
+      ns.scheduleForTracker(updated);
     }
   }
 }

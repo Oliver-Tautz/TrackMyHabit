@@ -77,12 +77,11 @@ class StorageService {
     _entries.add(entry);
   }
 
-  void updateEntry(Entry entry) {
-    final index = _entries.indexWhere(
-      (e) => e.trackerId == entry.trackerId && e.timestamp == entry.timestamp,
-    );
+  void updateEntry(Entry updatedEntry) {
+    final index = _entries.indexWhere((e) => e.id == updatedEntry.id);
+
     if (index != -1) {
-      _entries[index] = entry;
+      _entries[index] = updatedEntry;
     }
   }
 

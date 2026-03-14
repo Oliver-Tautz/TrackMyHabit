@@ -43,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final now = DateTime.now();
       _storage.addEntry(
         Entry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
           trackerId: '1',
           timestamp: now,
           values: {'Weight': 70.5, 'Body Fat %': 18.2},
@@ -50,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       _storage.addEntry(
         Entry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
           trackerId: '1',
           timestamp: now.subtract(const Duration(days: 1)),
           values: {'Weight': 70.8, 'Body Fat %': 18.5},
@@ -57,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       _storage.addEntry(
         Entry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
           trackerId: '1',
           timestamp: now.subtract(const Duration(days: 2)),
           values: {'Weight': 71.0, 'Body Fat %': 18.7},
@@ -159,6 +162,12 @@ class _HomeScreenState extends State<HomeScreen> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            IconButton(
+              icon: const Icon(Icons.edit),
+              color: Theme.of(context).colorScheme.primary,
+              onPressed: () => _editTracker(tracker),
+              tooltip: 'Edit Tracker',
+            ),
             // Notification toggle shown in the list (highlighted when enabled)
             IconButton(
               icon: Icon(
@@ -184,12 +193,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 setState(() {});
               },
               tooltip: 'Toggle Notifications',
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit),
-              color: Theme.of(context).colorScheme.primary,
-              onPressed: () => _editTracker(tracker),
-              tooltip: 'Edit Tracker',
             ),
           ],
         ),
