@@ -69,6 +69,7 @@ class NotificationScheduler {
             title: tracker.name,
             body: tracker.question,
             notificationDetails: _details,
+            payload: tracker.id,
           );
         },
       );
@@ -81,6 +82,7 @@ class NotificationScheduler {
         notificationDetails: _details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: repeat,
+        payload: tracker.id,
       );
     }
 

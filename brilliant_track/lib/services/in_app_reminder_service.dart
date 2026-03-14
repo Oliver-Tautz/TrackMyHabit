@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/tracker.dart';
 import 'storage_service.dart';
+import 'notification/notification_service.dart';
 
 /// In-app reminder service: checks trackers every minute and shows a dialog
 /// when a reminder is due. This is a fallback for platforms without OS
@@ -60,6 +61,17 @@ class InAppReminderService {
     if (_navigatorKey == null) return;
     final ctx = _navigatorKey!.currentState?.overlay?.context;
     if (ctx == null) return;
+
+    // Try to use OS notifications when available. If that fails or the
+    // platform doesn't support notifications, fall back to an in-app dialog.
+    try {
+      // showNowForTracker will initialize the NotificationService if needed
+      // and show a system notification (appears in the tray).
+      NotificationService().showNowForTracker(tracker);
+      return;
+    } catch (_) {
+      // ignore and fall through to dialog fallback
+    }
 
     showDialog(
       context: ctx,

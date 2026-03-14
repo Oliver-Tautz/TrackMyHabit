@@ -378,23 +378,18 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
   void _testNotification() async {
     try {
       final ns = NotificationService();
-      final id = await ns.scheduleForTracker(widget.tracker);
-      if (id != null && mounted) {
+      // Show an immediate notification for testing
+      await ns.showNowForTracker(widget.tracker);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Test notification scheduled')),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Notifications not supported on this platform'),
-          ),
+          const SnackBar(content: Text('Test notification shown')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to schedule: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed to show: $e')));
       }
     }
   }

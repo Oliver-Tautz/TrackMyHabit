@@ -8,7 +8,12 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 
 import '../../models/tracker.dart';
+import '../../services/storage_service.dart';
+import '../../screens/input_screen.dart';
+import 'package:flutter/material.dart';
+import '../../main.dart';
 import 'notification_scheduler.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -28,7 +33,11 @@ class NotificationService {
       AndroidNotificationDetails(
         _channelId,
         _channelName,
-        importance: Importance.defaultImportance,
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        channelShowBadge: true,
       );
 
   static const NotificationDetails notificationDetails = NotificationDetails(
@@ -67,9 +76,30 @@ class NotificationService {
       linux: linux,
     );
 
-    await _plugin.initialize(settings: settings);
+    await _plugin.initialize(
+      settings: settings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) async {
+        final payload = response.payload;
+        if (payload == null) return;
+        try {
+          final tracker = StorageService().getTracker(payload);
+          if (tracker != null) {
+            // Open the InputScreen directly so user can create an entry
+            navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (context) => InputScreen(tracker: tracker),
+              ),
+            );
+          }
+        } catch (_) {}
+      },
+    );
 
     if (Platform.isAndroid) {
+      // Request Android 13+ runtime permission to post notifications
+      try {
+        await Permission.notification.request();
+      } catch (_) {}
       const channel = AndroidNotificationChannel(
         _channelId,
         _channelName,
@@ -101,6 +131,19 @@ class NotificationService {
     if (!_initialized) await init();
 
     return _scheduler.schedule(tracker);
+  }
+
+  /// Show a notification immediately (testing helper). Payload is trackerId.
+  Future<void> showNowForTracker(Tracker tracker) async {
+    if (!_initialized) await init();
+    final id = tracker.id.hashCode & 0x7fffffff;
+    await _plugin.show(
+      id: id,
+      title: 'Reminder: ${tracker.name}',
+      body: tracker.question,
+      notificationDetails: notificationDetails,
+      payload: tracker.id,
+    );
   }
 
   Future<void> cancelForTrackerId(String trackerId) async {
