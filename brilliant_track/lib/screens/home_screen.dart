@@ -1,3 +1,4 @@
+import 'package:brilliant_track/ui_elements/elements.dart';
 import 'package:flutter/material.dart';
 import '../models/tracker.dart';
 import '../models/field.dart';
@@ -168,25 +169,10 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () => _editTracker(tracker),
               tooltip: 'Edit Tracker',
             ),
-            IconButton(
-              icon: Icon(
-                tracker.notificationsEnabled
-                    ? Icons.notifications
-                    : Icons.notifications_off,
-              ),
-              color: tracker.notificationsEnabled
-                  ? Theme.of(context).colorScheme.secondary
-                  : Theme.of(context).colorScheme.primary,
-              onPressed: () {
-                final updated = tracker.copyWith(
-                  notificationsEnabled: !tracker.notificationsEnabled,
-                );
-
-                _storage.updateTracker(updated);
-
-                setState(() {});
-              },
-              tooltip: 'Toggle Notifications',
+            NotificationToggleButton(
+              tracker: tracker,
+              storage: _storage,
+              onChanged: () => setState(() {}),
             ),
           ],
         ),
@@ -198,19 +184,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String _buildTrackerSubtitle(Tracker tracker) {
     final frequency = _getFrequencyText(tracker.schedule.frequency);
 
-    if (!tracker.notificationsEnabled) {
-      return '${tracker.fields.length} fields • $frequency';
-    }
-
     final time = tracker.schedule.time;
 
     return '${tracker.fields.length} fields • $frequency at $time';
-  }
-
-  String _formatReminderTime(TimeOfDay time) {
-    final now = DateTime.now();
-    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-    return TimeOfDay.fromDateTime(dt).format(context);
   }
 
   String _getFrequencyText(Frequency frequency) {

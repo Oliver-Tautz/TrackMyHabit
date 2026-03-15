@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:async';
-
+import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -130,6 +130,10 @@ class NotificationService {
     if (!_supportedPlatform) return null;
     if (!_initialized) await init();
 
+    dev.log(
+      "scheduling ${tracker.notificationId}",
+      name: "NotificationService",
+    );
     return _scheduler.schedule(tracker);
   }
 
@@ -146,9 +150,12 @@ class NotificationService {
     );
   }
 
-  Future<void> cancelForNotificationID(int notificationID) async {
+  Future<void> cancelForNotificationID(int notificationId) async {
     if (kIsWeb) return;
-
-    await _scheduler.cancel(notificationID);
+    dev.log(
+      "Cancelling notification $notificationId",
+      name: "NotificationService",
+    );
+    await _scheduler.cancel(notificationId);
   }
 }

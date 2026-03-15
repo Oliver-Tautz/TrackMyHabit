@@ -1,3 +1,4 @@
+import 'package:brilliant_track/widgets/notification_toggle_button.dart';
 import 'package:flutter/material.dart';
 import '../models/tracker.dart';
 import '../models/entry.dart';
@@ -62,13 +63,10 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
         ),
         actions: [
           IconButton(icon: const Icon(Icons.edit), onPressed: _editTracker),
-          IconButton(
-            icon: Icon(
-              tracker.notificationsEnabled
-                  ? Icons.notifications
-                  : Icons.notifications_off,
-            ),
-            onPressed: _toggleNotifications,
+          NotificationToggleButton(
+            tracker: tracker,
+            storage: _storage,
+            onChanged: () => setState(() {}),
           ),
         ],
       ),

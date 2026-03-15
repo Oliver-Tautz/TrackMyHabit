@@ -34,14 +34,30 @@ class StorageService {
     } catch (_) {}
   }
 
+  void toggleNotifications(String trackerId) {
+    final tracker = getTracker(trackerId)!;
+
+    final updated = tracker.copyWith(
+      notificationsEnabled: !tracker.notificationsEnabled,
+    );
+
+    updateTracker(updated);
+  }
+
   void updateTracker(Tracker tracker) {
     final index = _trackers.indexWhere((t) => t.id == tracker.id);
+
     if (index != -1) {
       _trackers[index] = tracker;
+
       try {
         final ns = NotificationService();
+
         ns.cancelForNotificationID(tracker.notificationId);
-        ns.scheduleForTracker(tracker);
+
+        if (tracker.notificationsEnabled) {
+          ns.scheduleForTracker(tracker);
+        }
       } catch (_) {}
     }
   }
