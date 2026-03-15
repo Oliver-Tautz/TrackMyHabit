@@ -9,13 +9,8 @@ import '../widgets/global_app_bar.dart';
 
 class TrackerDetailScreen extends StatefulWidget {
   final Tracker tracker;
-  final List<Entry> entries;
 
-  const TrackerDetailScreen({
-    super.key,
-    required this.tracker,
-    required this.entries,
-  });
+  const TrackerDetailScreen({super.key, required this.tracker});
 
   @override
   State<TrackerDetailScreen> createState() => _TrackerDetailScreenState();
@@ -24,16 +19,22 @@ class TrackerDetailScreen extends StatefulWidget {
 class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
   final _storage = StorageService();
   late Tracker tracker;
+  List<Entry> entries = [];
 
   @override
   void initState() {
     super.initState();
     tracker = widget.tracker;
+    _loadEntries();
+  }
+
+  void _loadEntries() {
+    entries = _storage.getEntriesForTracker(tracker.id);
   }
 
   @override
   Widget build(BuildContext context) {
-    final sortedEntries = List<Entry>.from(widget.entries)
+    final sortedEntries = List<Entry>.from(entries)
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     return Scaffold(
@@ -103,12 +104,10 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
   // -----------------------------
 
   Widget _buildStatsCard() {
-    final totalEntries = widget.entries.length;
+    final totalEntries = entries.length;
 
-    final lastEntry = widget.entries.isNotEmpty
-        ? widget.entries.reduce(
-            (a, b) => a.timestamp.isAfter(b.timestamp) ? a : b,
-          )
+    final lastEntry = entries.isNotEmpty
+        ? entries.reduce((a, b) => a.timestamp.isAfter(b.timestamp) ? a : b)
         : null;
 
     return Card(
@@ -294,7 +293,7 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
         builder: (context) =>
             InputScreen(tracker: tracker, existingEntry: entry),
       ),
-    ).then((_) => setState(() {}));
+    ).then((_) => _reloadEntries());
   }
 
   Future<void> _deleteEntry(Entry entry) async {
@@ -318,10 +317,7 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
 
     if (confirm == true) {
       _storage.deleteEntry(entry);
-
-      setState(() {
-        widget.entries.remove(entry);
-      });
+      _reloadEntries();
     }
   }
 
@@ -370,6 +366,11 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     }
   }
 
+  void _reloadEntries() {
+    setState(() {
+      _loadEntries();
+    });
+  }
   // -----------------------------
   // ACTIONS
   // -----------------------------
@@ -378,7 +379,7 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => InputScreen(tracker: tracker)),
-    ).then((_) => setState(() {}));
+    ).then((_) => _reloadEntries());
   }
 
   void _editTracker() {
@@ -396,13 +397,7 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
   }
 
   void _toggleNotifications() {
-    final updated = Tracker(
-      id: tracker.id,
-      name: tracker.name,
-      question: tracker.question,
-      fields: tracker.fields,
-      schedule: tracker.schedule,
-      icon: tracker.icon,
+    final updated = tracker.copyWith(
       notificationsEnabled: !tracker.notificationsEnabled,
     );
 
@@ -412,7 +407,7 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     final ns = NotificationService();
 
     if (!updated.notificationsEnabled) {
-      ns.cancelForTrackerId(updated.id);
+      ns.cancelForNotificationID(updated.notificationId);
     } else {
       ns.scheduleForTracker(updated);
     }

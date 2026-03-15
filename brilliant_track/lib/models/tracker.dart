@@ -32,6 +32,7 @@ class Tracker {
   final Schedule schedule;
   final IconData? icon;
   final bool notificationsEnabled;
+  final int notificationId;
 
   Tracker({
     required this.id,
@@ -39,7 +40,28 @@ class Tracker {
     required this.question,
     required this.fields,
     required this.schedule,
+    int? notificationId,
     this.icon,
     this.notificationsEnabled = true,
-  });
+  }) : notificationId = notificationId ?? id.hashCode & 0x7fffffff;
+
+  Tracker copyWith({
+    String? name,
+    String? question,
+    List<Field>? fields,
+    Schedule? schedule,
+    IconData? icon,
+    bool? notificationsEnabled,
+  }) {
+    return Tracker(
+      id: id,
+      name: name ?? this.name,
+      question: question ?? this.question,
+      fields: fields ?? this.fields,
+      schedule: schedule ?? this.schedule,
+      icon: icon ?? this.icon,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      notificationId: notificationId,
+    );
+  }
 }

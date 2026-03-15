@@ -154,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(tracker.question),
             const SizedBox(height: 8),
             Text(
-              '${tracker.fields.length} fields • ${_getFrequencyText(tracker.schedule.frequency)}',
+              _buildTrackerSubtitle(tracker),
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
@@ -168,7 +168,6 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () => _editTracker(tracker),
               tooltip: 'Edit Tracker',
             ),
-            // Notification toggle shown in the list (highlighted when enabled)
             IconButton(
               icon: Icon(
                 tracker.notificationsEnabled
@@ -179,17 +178,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? Theme.of(context).colorScheme.secondary
                   : Theme.of(context).colorScheme.primary,
               onPressed: () {
-                // Toggle the tracker notifications
-                final updated = Tracker(
-                  id: tracker.id,
-                  name: tracker.name,
-                  question: tracker.question,
-                  fields: tracker.fields,
-                  schedule: tracker.schedule,
-                  icon: tracker.icon,
+                final updated = tracker.copyWith(
                   notificationsEnabled: !tracker.notificationsEnabled,
                 );
+
                 _storage.updateTracker(updated);
+
                 setState(() {});
               },
               tooltip: 'Toggle Notifications',
@@ -199,6 +193,24 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => _viewTrackerDetails(tracker),
       ),
     );
+  }
+
+  String _buildTrackerSubtitle(Tracker tracker) {
+    final frequency = _getFrequencyText(tracker.schedule.frequency);
+
+    if (!tracker.notificationsEnabled) {
+      return '${tracker.fields.length} fields • $frequency';
+    }
+
+    final time = tracker.schedule.time;
+
+    return '${tracker.fields.length} fields • $frequency at $time';
+  }
+
+  String _formatReminderTime(TimeOfDay time) {
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+    return TimeOfDay.fromDateTime(dt).format(context);
   }
 
   String _getFrequencyText(Frequency frequency) {
@@ -226,13 +238,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _viewTrackerDetails(Tracker tracker) {
     // Get real entries from storage
-    final entries = _storage.getEntriesForTracker(tracker.id);
 
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            TrackerDetailScreen(tracker: tracker, entries: entries),
+        builder: (context) => TrackerDetailScreen(tracker: tracker),
       ),
     ).then((_) {
       // Refresh the screen when returning

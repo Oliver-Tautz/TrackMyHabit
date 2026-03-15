@@ -22,7 +22,7 @@ class NotificationScheduler {
   }
 
   Future<int> schedule(Tracker tracker) async {
-    final id = tracker.id.hashCode & 0x7fffffff;
+    final id = tracker.notificationId;
 
     final parts = tracker.schedule.time.split(':');
     final hour = int.parse(parts[0]);

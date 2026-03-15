@@ -40,19 +40,26 @@ class StorageService {
       _trackers[index] = tracker;
       try {
         final ns = NotificationService();
-        ns.cancelForTrackerId(tracker.id);
+        ns.cancelForNotificationID(tracker.notificationId);
         ns.scheduleForTracker(tracker);
       } catch (_) {}
     }
   }
 
   void deleteTracker(String id) {
+    final tracker = _trackers.firstWhere(
+      (t) => t.id == id,
+      orElse: () => throw Exception("Tracker not found"),
+    );
+
     _trackers.removeWhere((t) => t.id == id);
-    // Also delete all entries for this tracker
+
+    // Delete entries
     _entries.removeWhere((e) => e.trackerId == id);
+
     try {
       final ns = NotificationService();
-      ns.cancelForTrackerId(id);
+      ns.cancelForNotificationID(tracker.notificationId);
     } catch (_) {}
   }
 

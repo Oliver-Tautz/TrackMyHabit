@@ -136,7 +136,7 @@ class NotificationService {
   /// Show a notification immediately (testing helper). Payload is trackerId.
   Future<void> showNowForTracker(Tracker tracker) async {
     if (!_initialized) await init();
-    final id = tracker.id.hashCode & 0x7fffffff;
+    final id = tracker.notificationId;
     await _plugin.show(
       id: id,
       title: 'Reminder: ${tracker.name}',
@@ -146,10 +146,9 @@ class NotificationService {
     );
   }
 
-  Future<void> cancelForTrackerId(String trackerId) async {
+  Future<void> cancelForNotificationID(int notificationID) async {
     if (kIsWeb) return;
 
-    final id = trackerId.hashCode & 0x7fffffff;
-    await _scheduler.cancel(id);
+    await _scheduler.cancel(notificationID);
   }
 }

@@ -81,3 +81,13 @@ Inside:
 ```
 hello_world
 ```
+
+
+TODO:
+
+Make top bar better
+fix UI date access
+add persistence
+make edit field possible
+make real logo
+...
