@@ -34,6 +34,7 @@ class InAppReminderService {
     final now = DateTime.now();
     final storage = StorageService();
     for (var t in storage.getAllTrackers()) {
+      if (!t.notificationsEnabled) continue;
       final sched = t.schedule;
       final parts = sched.time.split(':');
       final hour = int.parse(parts[0]);

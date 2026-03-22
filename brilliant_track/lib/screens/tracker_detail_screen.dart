@@ -5,7 +5,6 @@ import '../models/entry.dart';
 import '../services/storage_service.dart';
 import 'input_screen.dart';
 import 'create_tracker_screen.dart';
-import '../services/notification/notification_service.dart';
 import '../widgets/global_app_bar.dart';
 
 class TrackerDetailScreen extends StatefulWidget {
@@ -66,7 +65,14 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
           NotificationToggleButton(
             tracker: tracker,
             storage: _storage,
-            onChanged: () => setState(() {}),
+            onChanged: () {
+              setState(() {
+                final updated = _storage.getTracker(tracker.id);
+                if (updated != null) {
+                  tracker = updated;
+                }
+              });
+            },
           ),
         ],
       ),
@@ -220,6 +226,12 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
             _getEntrySummary(entry),
             style: const TextStyle(fontSize: 13),
           ),
+          trailing: IconButton(
+            icon: const Icon(Icons.edit),
+            color: Theme.of(context).colorScheme.primary,
+            onPressed: () => _editEntry(entry),
+            tooltip: 'Edit Entry',
+          ),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
@@ -261,14 +273,6 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Edit Entry'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _editEntry(entry);
-                },
-              ),
               ListTile(
                 leading: const Icon(Icons.delete),
                 title: const Text('Delete Entry'),
@@ -392,22 +396,5 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
         setState(() => tracker = updated);
       }
     });
-  }
-
-  void _toggleNotifications() {
-    final updated = tracker.copyWith(
-      notificationsEnabled: !tracker.notificationsEnabled,
-    );
-
-    _storage.updateTracker(updated);
-    setState(() => tracker = updated);
-
-    final ns = NotificationService();
-
-    if (!updated.notificationsEnabled) {
-      ns.cancelForNotificationID(updated.notificationId);
-    } else {
-      ns.scheduleForTracker(updated);
-    }
   }
 }

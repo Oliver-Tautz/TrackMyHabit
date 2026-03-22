@@ -127,6 +127,13 @@ class StorageService {
     return trackerEntries.first;
   }
 
+  void reorderTrackers(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+
+    final item = _trackers.removeAt(oldIndex);
+    _trackers.insert(newIndex, item);
+  }
+
   // Clear all data (useful for testing)
   void clearAll() {
     _trackers.clear();

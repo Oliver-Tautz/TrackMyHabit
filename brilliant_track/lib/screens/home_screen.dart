@@ -1,13 +1,14 @@
-import 'package:brilliant_track/ui_elements/elements.dart';
+import 'package:brilliant_track/widgets/notification_toggle_button.dart';
 import 'package:flutter/material.dart';
 import '../models/tracker.dart';
 import '../models/field.dart';
 import '../models/entry.dart';
 import '../services/storage_service.dart';
-import 'input_screen.dart';
+
 import 'create_tracker_screen.dart';
 import 'tracker_detail_screen.dart';
 import '../widgets/global_app_bar.dart';
+import 'package:flutter/foundation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,12 +23,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeSampleData();
+    if (kDebugMode) {
+      _initializeSampleData();
+    }
   }
 
   void _initializeSampleData() {
-    // Add sample tracker if storage is empty
     if (_storage.getAllTrackers().isEmpty) {
+      final now = DateTime.now();
+
+      // ------------------------
+      // First tracker (existing)
+      // ------------------------
       final sampleTracker = Tracker(
         id: '1',
         name: 'Weight Tracker',
@@ -36,12 +43,15 @@ class _HomeScreenState extends State<HomeScreen> {
           Field(name: 'Weight', type: FieldType.float),
           Field(name: 'Body Fat %', type: FieldType.float),
         ],
-        schedule: Schedule(frequency: Frequency.daily, time: '08:00'),
+        schedule: Schedule(
+          frequency: Frequency.daily,
+          time:
+              '${now.hour.toString().padLeft(2, '0')}:${now.add(Duration(minutes: 1)).minute.toString().padLeft(2, '0')}',
+        ),
       );
+
       _storage.addTracker(sampleTracker);
 
-      // Add some sample entries
-      final now = DateTime.now();
       _storage.addEntry(
         Entry(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -50,20 +60,32 @@ class _HomeScreenState extends State<HomeScreen> {
           values: {'Weight': 70.5, 'Body Fat %': 18.2},
         ),
       );
-      _storage.addEntry(
-        Entry(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          trackerId: '1',
-          timestamp: now.subtract(const Duration(days: 1)),
-          values: {'Weight': 70.8, 'Body Fat %': 18.5},
+
+      // ------------------------
+      // Second tracker (NEW)
+      // ------------------------
+      final later = now.add(const Duration(minutes: 2));
+
+      final hydrationTracker = Tracker(
+        id: '2',
+        name: 'Hydration Check',
+        question: 'Did you drink enough water?',
+        fields: [Field(name: 'Glasses', type: FieldType.integer)],
+        schedule: Schedule(
+          frequency: Frequency.daily,
+          time:
+              '${later.hour.toString().padLeft(2, '0')}:${later.minute.toString().padLeft(2, '0')}',
         ),
       );
+
+      _storage.addTracker(hydrationTracker);
+
       _storage.addEntry(
         Entry(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          trackerId: '1',
-          timestamp: now.subtract(const Duration(days: 2)),
-          values: {'Weight': 71.0, 'Body Fat %': 18.7},
+          id: (DateTime.now().millisecondsSinceEpoch + 1).toString(),
+          trackerId: '2',
+          timestamp: now,
+          values: {'Glasses': 5},
         ),
       );
     }
@@ -97,11 +119,28 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: trackers.isEmpty
           ? _buildEmptyState()
-          : ListView.builder(
+          : ReorderableListView.builder(
+              buildDefaultDragHandles: false,
+              proxyDecorator: (child, index, animation) {
+                return Material(
+                  elevation: 6,
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: double.infinity, // 👈 FORCE full width
+                    child: child,
+                  ),
+                );
+              },
               padding: const EdgeInsets.all(16),
               itemCount: trackers.length,
+              onReorder: _onReorder,
               itemBuilder: (context, index) {
-                return _buildTrackerCard(trackers[index]);
+                final tracker = trackers[index];
+                return _buildTrackerCard(
+                  tracker,
+                  index: index,
+                  key: ValueKey(tracker.id),
+                );
               },
             ),
       floatingActionButton: FloatingActionButton.extended(
@@ -133,13 +172,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTrackerCard(Tracker tracker) {
+  Widget _buildTrackerCard(
+    Tracker tracker, {
+    required int index,
+    required Key key,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Card(
+      key: key,
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.primary,
+          backgroundColor: colorScheme.primary,
           child: tracker.icon != null
               ? Icon(tracker.icon, color: Colors.white)
               : const Icon(Icons.analytics, color: Colors.white),
@@ -160,25 +206,52 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit),
-              color: Theme.of(context).colorScheme.primary,
-              onPressed: () => _editTracker(tracker),
-              tooltip: 'Edit Tracker',
-            ),
-            NotificationToggleButton(
-              tracker: tracker,
-              storage: _storage,
-              onChanged: () => setState(() {}),
-            ),
-          ],
+
+        // 👇 FIXED TRAILING
+        trailing: SizedBox(
+          height: 48, // ensures consistent tap area
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildIconWrapper(
+                child: NotificationToggleButton(
+                  tracker: tracker,
+                  storage: _storage,
+                  onChanged: () => setState(() {}),
+                ),
+              ),
+              _buildIconWrapper(
+                child: IconButton(
+                  icon: const Icon(Icons.edit),
+                  color: colorScheme.primary,
+                  onPressed: () => _editTracker(tracker),
+                ),
+              ),
+              ReorderableDragStartListener(
+                index: index,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Icon(Icons.drag_handle),
+                ),
+              ),
+            ],
+          ),
         ),
+
         onTap: () => _viewTrackerDetails(tracker),
       ),
     );
+  }
+
+  /// 👇 Helper to normalize size & padding
+  Widget _buildIconWrapper({required Widget child}) {
+    return SizedBox(width: 40, height: 40, child: Center(child: child));
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    setState(() {
+      _storage.reorderTrackers(oldIndex, newIndex);
+    });
   }
 
   String _buildTrackerSubtitle(Tracker tracker) {
@@ -202,14 +275,35 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _addEntry(Tracker tracker) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => InputScreen(tracker: tracker)),
-    ).then((_) {
-      // Refresh the screen after adding entry
-      setState(() {});
-    });
+  void _showTrackerOptions(Tracker tracker) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Edit Tracker'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editTracker(tracker);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Delete Tracker'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteTracker(tracker);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _viewTrackerDetails(Tracker tracker) {
@@ -255,5 +349,40 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     });
+  }
+
+  void _deleteTracker(Tracker tracker) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Tracker'),
+          content: Text(
+            'This will delete "${tracker.name}" and all its entries. Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    if (confirmed != true) return;
+
+    _storage.deleteTracker(tracker.id);
+
+    setState(() {});
+
+    // Optional: feedback
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('${tracker.name} deleted')));
   }
 }
