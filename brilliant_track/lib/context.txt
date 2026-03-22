@@ -1,0 +1,2252 @@
+./screens/home_screen.dart
+import 'package:brilliant_track/ui_elements/elements.dart';
+import 'package:flutter/material.dart';
+import '../models/tracker.dart';
+import '../models/field.dart';
+import '../models/entry.dart';
+import '../services/storage_service.dart';
+import 'input_screen.dart';
+import 'create_tracker_screen.dart';
+import 'tracker_detail_screen.dart';
+import '../widgets/global_app_bar.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final _storage = StorageService();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeSampleData();
+  }
+
+  void _initializeSampleData() {
+    // Add sample tracker if storage is empty
+    if (_storage.getAllTrackers().isEmpty) {
+      final sampleTracker = Tracker(
+        id: '1',
+        name: 'Weight Tracker',
+        question: 'What is your weight today?',
+        fields: [
+          Field(name: 'Weight', type: FieldType.float),
+          Field(name: 'Body Fat %', type: FieldType.float),
+        ],
+        schedule: Schedule(frequency: Frequency.daily, time: '08:00'),
+      );
+      _storage.addTracker(sampleTracker);
+
+      // Add some sample entries
+      final now = DateTime.now();
+      _storage.addEntry(
+        Entry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          trackerId: '1',
+          timestamp: now,
+          values: {'Weight': 70.5, 'Body Fat %': 18.2},
+        ),
+      );
+      _storage.addEntry(
+        Entry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          trackerId: '1',
+          timestamp: now.subtract(const Duration(days: 1)),
+          values: {'Weight': 70.8, 'Body Fat %': 18.5},
+        ),
+      );
+      _storage.addEntry(
+        Entry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          trackerId: '1',
+          timestamp: now.subtract(const Duration(days: 2)),
+          values: {'Weight': 71.0, 'Body Fat %': 18.7},
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final trackers = _storage.getAllTrackers();
+    return Scaffold(
+      appBar: GlobalAppBar(
+        title: const Text('brilliant.track'),
+        actions: [
+          PopupMenuButton<int>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (c) => Scaffold(
+                    appBar: AppBar(title: const Text('Settings')),
+                    body: const Center(child: Text('Settings (mock)')),
+                  ),
+                ),
+              );
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 1, child: Text('Settings')),
+            ],
+          ),
+        ],
+      ),
+      body: trackers.isEmpty
+          ? _buildEmptyState()
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: trackers.length,
+              itemBuilder: (context, index) {
+                return _buildTrackerCard(trackers[index]);
+              },
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _createNewTracker,
+        icon: const Icon(Icons.add),
+        label: const Text('New Tracker'),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.track_changes, size: 100, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            'No trackers yet',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Create your first tracker to get started',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrackerCard(Tracker tracker) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: CircleAvatar(
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          child: tracker.icon != null
+              ? Icon(tracker.icon, color: Colors.white)
+              : const Icon(Icons.analytics, color: Colors.white),
+        ),
+        title: Text(
+          tracker.name,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(tracker.question),
+            const SizedBox(height: 8),
+            Text(
+              _buildTrackerSubtitle(tracker),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit),
+              color: Theme.of(context).colorScheme.primary,
+              onPressed: () => _editTracker(tracker),
+              tooltip: 'Edit Tracker',
+            ),
+            NotificationToggleButton(
+              tracker: tracker,
+              storage: _storage,
+              onChanged: () => setState(() {}),
+            ),
+          ],
+        ),
+        onTap: () => _viewTrackerDetails(tracker),
+      ),
+    );
+  }
+
+  String _buildTrackerSubtitle(Tracker tracker) {
+    final frequency = _getFrequencyText(tracker.schedule.frequency);
+
+    final time = tracker.schedule.time;
+
+    return '${tracker.fields.length} fields • $frequency at $time';
+  }
+
+  String _getFrequencyText(Frequency frequency) {
+    switch (frequency) {
+      case Frequency.daily:
+        return 'Daily';
+      case Frequency.weekly:
+        return 'Weekly';
+      case Frequency.monthly:
+        return 'Monthly';
+      case Frequency.custom:
+        return 'Custom';
+    }
+  }
+
+  void _addEntry(Tracker tracker) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => InputScreen(tracker: tracker)),
+    ).then((_) {
+      // Refresh the screen after adding entry
+      setState(() {});
+    });
+  }
+
+  void _viewTrackerDetails(Tracker tracker) {
+    // Get real entries from storage
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TrackerDetailScreen(tracker: tracker),
+      ),
+    ).then((_) {
+      // Refresh the screen when returning
+      setState(() {});
+    });
+  }
+
+  void _createNewTracker() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CreateTrackerScreen()),
+    ).then((newTracker) {
+      if (newTracker != null && newTracker is Tracker) {
+        _storage.addTracker(newTracker);
+        if (mounted) setState(() {});
+      }
+    });
+  }
+
+  void _editTracker(Tracker tracker) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateTrackerScreen(initialTracker: tracker),
+      ),
+    ).then((updatedTracker) {
+      if (updatedTracker != null && updatedTracker is Tracker) {
+        _storage.updateTracker(updatedTracker);
+        if (mounted) {
+          setState(() {});
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Tracker updated')));
+        }
+      }
+    });
+  }
+}
+./screens/input_screen.dart
+import 'package:flutter/material.dart';
+import '../models/tracker.dart';
+import '../models/field.dart';
+import '../models/entry.dart';
+import '../services/storage_service.dart';
+
+class InputScreen extends StatefulWidget {
+  final Tracker tracker;
+  final Entry? existingEntry;
+
+  const InputScreen({super.key, required this.tracker, this.existingEntry});
+
+  @override
+  State<InputScreen> createState() => _InputScreenState();
+}
+
+class _InputScreenState extends State<InputScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final Map<String, TextEditingController> _controllers = {};
+  final _storage = StorageService();
+
+  DateTime _selectedDateTime = DateTime.now();
+
+  bool get isEditing => widget.existingEntry != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // If editing, use existing timestamp
+    if (isEditing) {
+      _selectedDateTime = widget.existingEntry!.timestamp;
+    }
+
+    // Create controllers and prefill values if editing
+    for (var field in widget.tracker.fields) {
+      final controller = TextEditingController();
+
+      if (isEditing && widget.existingEntry!.values.containsKey(field.name)) {
+        controller.text = widget.existingEntry!.values[field.name].toString();
+      }
+
+      _controllers[field.name] = controller;
+    }
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isEditing ? "Edit Entry" : widget.tracker.name),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Card(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    widget.tracker.question,
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              ...widget.tracker.fields.map((field) => _buildFieldInput(field)),
+
+              const SizedBox(height: 24),
+
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.calendar_today),
+                  title: const Text('Date & Time'),
+                  subtitle: Text(
+                    '${_selectedDateTime.year}-${_selectedDateTime.month.toString().padLeft(2, '0')}-${_selectedDateTime.day.toString().padLeft(2, '0')} '
+                    '${_selectedDateTime.hour.toString().padLeft(2, '0')}:${_selectedDateTime.minute.toString().padLeft(2, '0')}',
+                  ),
+                  trailing: const Icon(Icons.edit),
+                  onTap: _selectDateTime,
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              ElevatedButton(
+                onPressed: _saveEntry,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(16),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(
+                  isEditing ? 'Update Entry' : 'Save Entry',
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFieldInput(Field field) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
+        controller: _controllers[field.name],
+        decoration: InputDecoration(
+          labelText: field.name,
+          border: const OutlineInputBorder(),
+          suffixIcon: Icon(_getFieldIcon(field.type)),
+        ),
+        keyboardType: _getKeyboardType(field.type),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter ${field.name}';
+          }
+
+          if (field.type == FieldType.integer ||
+              field.type == FieldType.float) {
+            if (double.tryParse(value) == null) {
+              return 'Please enter a valid number';
+            }
+          }
+
+          return null;
+        },
+      ),
+    );
+  }
+
+  IconData _getFieldIcon(FieldType type) {
+    switch (type) {
+      case FieldType.integer:
+      case FieldType.float:
+        return Icons.numbers;
+      case FieldType.text:
+        return Icons.text_fields;
+      case FieldType.image:
+        return Icons.image;
+    }
+  }
+
+  TextInputType _getKeyboardType(FieldType type) {
+    switch (type) {
+      case FieldType.integer:
+        return TextInputType.number;
+      case FieldType.float:
+        return const TextInputType.numberWithOptions(decimal: true);
+      case FieldType.text:
+        return TextInputType.text;
+      case FieldType.image:
+        return TextInputType.text;
+    }
+  }
+
+  Future<void> _selectDateTime() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDateTime,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+
+    if (date != null && mounted) {
+      final time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_selectedDateTime),
+      );
+
+      if (time != null && mounted) {
+        setState(() {
+          _selectedDateTime = DateTime(
+            date.year,
+            date.month,
+            date.day,
+            time.hour,
+            time.minute,
+          );
+        });
+      }
+    }
+  }
+
+  void _saveEntry() {
+    if (_formKey.currentState!.validate()) {
+      final Map<String, dynamic> values = {};
+
+      for (var field in widget.tracker.fields) {
+        final value = _controllers[field.name]!.text;
+
+        if (field.type == FieldType.integer) {
+          values[field.name] = int.parse(value);
+        } else if (field.type == FieldType.float) {
+          values[field.name] = double.parse(value);
+        } else {
+          values[field.name] = value;
+        }
+      }
+
+      final entry = Entry(
+        id:
+            widget.existingEntry?.id ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
+        trackerId: widget.tracker.id,
+        timestamp: _selectedDateTime,
+        values: values,
+      );
+
+      if (isEditing) {
+        _storage.updateEntry(entry);
+      } else {
+        _storage.addEntry(entry);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isEditing
+                ? 'Entry updated successfully!'
+                : 'Entry saved successfully!',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pop(context, true);
+    }
+  }
+}
+./screens/create_tracker_screen.dart
+import 'package:flutter/material.dart';
+import '../models/tracker.dart';
+import '../models/field.dart';
+
+class CreateTrackerScreen extends StatefulWidget {
+  // When provided, the screen operates in "edit" mode and will prefill values.
+  final Tracker? initialTracker;
+
+  const CreateTrackerScreen({super.key, this.initialTracker});
+
+  @override
+  State<CreateTrackerScreen> createState() => _CreateTrackerScreenState();
+}
+
+class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _questionController = TextEditingController();
+  final List<FieldData> _fields = [];
+  Frequency _selectedFrequency = Frequency.daily;
+  final _timeController = TextEditingController(text: '08:00');
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _questionController.dispose();
+    _timeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final t = widget.initialTracker;
+    if (t != null) {
+      // Prefill form for edit
+      _nameController.text = t.name;
+      _questionController.text = t.question;
+      _selectedFrequency = t.schedule.frequency;
+      _timeController.text = t.schedule.time;
+      _fields.clear();
+      for (var f in t.fields) {
+        _fields.add(FieldData(name: f.name, type: f.type));
+      }
+      _selectedIcon = t.icon;
+    }
+  }
+
+  IconData? _selectedIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.initialTracker == null ? 'Create New Tracker' : 'Edit Tracker',
+        ),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Tracker name
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Tracker Name',
+                  hintText: 'e.g., Weight Tracker',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.label),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a tracker name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Question
+              TextFormField(
+                controller: _questionController,
+                decoration: const InputDecoration(
+                  labelText: 'Question',
+                  hintText: 'e.g., What is your weight today?',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.help_outline),
+                ),
+                maxLines: 2,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a question';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Icon picker
+              Text('Icon', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              _buildIconPicker(),
+
+              const SizedBox(height: 24),
+
+              // Fields section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Fields', style: Theme.of(context).textTheme.titleLarge),
+                  TextButton.icon(
+                    onPressed: _addField,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Field'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Fields list
+              if (_fields.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        Icon(Icons.inbox, size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No fields yet',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Add at least one field to track',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ..._fields.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final field = entry.value;
+                  return _buildFieldCard(field, index);
+                }),
+
+              const SizedBox(height: 24),
+
+              // Schedule section
+              Text('Schedule', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+
+              // Frequency dropdown
+              DropdownButtonFormField<Frequency>(
+                initialValue: _selectedFrequency,
+                decoration: const InputDecoration(
+                  labelText: 'Frequency',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.repeat),
+                ),
+                items: Frequency.values.map((freq) {
+                  return DropdownMenuItem(
+                    value: freq,
+                    child: Text(_getFrequencyText(freq)),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFrequency = value!;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Time input
+              ListTile(
+                leading: const Icon(Icons.access_time),
+                title: const Text('Time'),
+                subtitle: Text(_timeController.text),
+                trailing: const Icon(Icons.edit),
+                onTap: () async {
+                  final timeOfDay = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay(
+                      hour: int.parse(_timeController.text.split(':')[0]),
+                      minute: int.parse(_timeController.text.split(':')[1]),
+                    ),
+                  );
+                  if (timeOfDay != null) {
+                    setState(() {
+                      _timeController.text =
+                          '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}';
+                    });
+                  }
+                },
+              ),
+
+              const SizedBox(height: 16),
+              // Frequency-specific selectors
+              if (_selectedFrequency == Frequency.weekly) ...[
+                Text(
+                  'Day of week',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                _buildWeekdaySelector(),
+                const SizedBox(height: 16),
+              ] else if (_selectedFrequency == Frequency.monthly) ...[
+                Text(
+                  'Day of month',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                _buildDayOfMonthSelector(),
+                const SizedBox(height: 16),
+              ],
+
+              const SizedBox(height: 32),
+
+              // Create/Save button
+              ElevatedButton(
+                onPressed: _createTracker,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(16),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(
+                  widget.initialTracker == null
+                      ? 'Create Tracker'
+                      : 'Save Changes',
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFieldCard(FieldData fieldData, int index) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: CircleAvatar(child: Icon(_getFieldTypeIcon(fieldData.type))),
+        title: Text(fieldData.name),
+        subtitle: Text(_getFieldTypeText(fieldData.type)),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete),
+          onPressed: () => _removeField(index),
+        ),
+      ),
+    );
+  }
+
+  void _addField() {
+    showDialog(
+      context: context,
+      builder: (context) => _AddFieldDialog(
+        onAdd: (fieldData) {
+          setState(() {
+            _fields.add(fieldData);
+          });
+        },
+      ),
+    );
+  }
+
+  void _removeField(int index) {
+    setState(() {
+      _fields.removeAt(index);
+    });
+  }
+
+  String _getFrequencyText(Frequency frequency) {
+    switch (frequency) {
+      case Frequency.daily:
+        return 'Daily';
+      case Frequency.weekly:
+        return 'Weekly';
+      case Frequency.monthly:
+        return 'Monthly';
+      case Frequency.custom:
+        return 'Custom';
+    }
+  }
+
+  String _getFieldTypeText(FieldType type) {
+    switch (type) {
+      case FieldType.integer:
+        return 'Integer';
+      case FieldType.float:
+        return 'Decimal';
+      case FieldType.text:
+        return 'Text';
+      case FieldType.image:
+        return 'Image';
+    }
+  }
+
+  Widget _buildIconPicker() {
+    // Choose 10 material icons to present as options
+    final icons = [
+      Icons.insights,
+      Icons.fitness_center,
+      Icons.fastfood,
+      Icons.nest_cam_wired_stand,
+      Icons.self_improvement,
+      Icons.water,
+      Icons.nightlight_round,
+      Icons.directions_run,
+      Icons.bedtime,
+      Icons.checkroom,
+    ];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: icons.map((ic) {
+        final selected = _selectedIcon == ic;
+        return GestureDetector(
+          onTap: () => setState(() => _selectedIcon = ic),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: selected
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : null,
+              borderRadius: BorderRadius.circular(8),
+              border: selected
+                  ? Border.all(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 2,
+                    )
+                  : null,
+            ),
+            child: Icon(
+              ic,
+              size: 32,
+              color: selected ? Theme.of(context).colorScheme.primary : null,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildWeekdaySelector() {
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // ignore: unused_local_variable
+    int? selected = widget.initialTracker?.schedule.weekday;
+    if (_selectedFrequency == Frequency.weekly && _selectedIcon != null) {
+      // noop
+    }
+
+    return Wrap(
+      spacing: 8,
+      children: List.generate(7, (i) {
+        final dayNumber = i + 1; // 1..7
+        // ignore: unused_local_variable
+        final isSelected =
+            (widget.initialTracker?.schedule.weekday == dayNumber) || (false);
+        return ChoiceChip(
+          label: Text(days[i]),
+          selected: _selectedWeekday == dayNumber,
+          onSelected: (_) {
+            setState(() {
+              _selectedWeekday = dayNumber;
+            });
+          },
+        );
+      }),
+    );
+  }
+
+  Widget _buildDayOfMonthSelector() {
+    return DropdownButton<int>(
+      value: _selectedDayOfMonth,
+      items: List.generate(31, (i) => i + 1)
+          .map((d) => DropdownMenuItem(value: d, child: Text(d.toString())))
+          .toList(),
+      onChanged: (v) => setState(() => _selectedDayOfMonth = v),
+      hint: const Text('Select day'),
+    );
+  }
+
+  int? _selectedWeekday;
+  int? _selectedDayOfMonth;
+
+  IconData _getFieldTypeIcon(FieldType type) {
+    switch (type) {
+      case FieldType.integer:
+      case FieldType.float:
+        return Icons.numbers;
+      case FieldType.text:
+        return Icons.text_fields;
+      case FieldType.image:
+        return Icons.image;
+    }
+  }
+
+  void _createTracker() {
+    if (_formKey.currentState!.validate()) {
+      if (_fields.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please add at least one field'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      final id =
+          widget.initialTracker?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString();
+
+      final tracker = Tracker(
+        id: id,
+        name: _nameController.text,
+        question: _questionController.text,
+        fields: _fields
+            .map((fd) => Field(name: fd.name, type: fd.type))
+            .toList(),
+        schedule: Schedule(
+          frequency: _selectedFrequency,
+          time: _timeController.text,
+          weekday: _selectedWeekday,
+          dayOfMonth: _selectedDayOfMonth,
+        ),
+        icon: _selectedIcon,
+      );
+
+      Navigator.pop(context, tracker);
+    }
+  }
+}
+
+// Helper class to store field data during creation
+class FieldData {
+  final String name;
+  final FieldType type;
+
+  FieldData({required this.name, required this.type});
+}
+
+// Dialog for adding a new field
+class _AddFieldDialog extends StatefulWidget {
+  final Function(FieldData) onAdd;
+
+  const _AddFieldDialog({required this.onAdd});
+
+  @override
+  State<_AddFieldDialog> createState() => _AddFieldDialogState();
+}
+
+class _AddFieldDialogState extends State<_AddFieldDialog> {
+  final _nameController = TextEditingController();
+  FieldType _selectedType = FieldType.float;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Field'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(
+              labelText: 'Field Name',
+              hintText: 'e.g., Weight',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<FieldType>(
+            initialValue: _selectedType,
+            decoration: const InputDecoration(
+              labelText: 'Field Type',
+              border: OutlineInputBorder(),
+            ),
+            items: FieldType.values.map((type) {
+              return DropdownMenuItem(
+                value: type,
+                child: Text(_getFieldTypeText(type)),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedType = value!;
+              });
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_nameController.text.isNotEmpty) {
+              widget.onAdd(
+                FieldData(name: _nameController.text, type: _selectedType),
+              );
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+
+  String _getFieldTypeText(FieldType type) {
+    switch (type) {
+      case FieldType.integer:
+        return 'Integer';
+      case FieldType.float:
+        return 'Decimal';
+      case FieldType.text:
+        return 'Text';
+      case FieldType.image:
+        return 'Image';
+    }
+  }
+}
+./screens/tracker_detail_screen.dart
+import 'package:brilliant_track/widgets/notification_toggle_button.dart';
+import 'package:flutter/material.dart';
+import '../models/tracker.dart';
+import '../models/entry.dart';
+import '../services/storage_service.dart';
+import 'input_screen.dart';
+import 'create_tracker_screen.dart';
+import '../services/notification/notification_service.dart';
+import '../widgets/global_app_bar.dart';
+
+class TrackerDetailScreen extends StatefulWidget {
+  final Tracker tracker;
+
+  const TrackerDetailScreen({super.key, required this.tracker});
+
+  @override
+  State<TrackerDetailScreen> createState() => _TrackerDetailScreenState();
+}
+
+class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
+  final _storage = StorageService();
+  late Tracker tracker;
+  List<Entry> entries = [];
+
+  @override
+  void initState() {
+    super.initState();
+    tracker = widget.tracker;
+    _loadEntries();
+  }
+
+  void _loadEntries() {
+    entries = _storage.getEntriesForTracker(tracker.id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sortedEntries = List<Entry>.from(entries)
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+    return Scaffold(
+      appBar: GlobalAppBar(
+        showHomeButton: false,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              child: tracker.icon != null
+                  ? Icon(tracker.icon, color: Colors.white, size: 18)
+                  : const Icon(Icons.analytics, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                tracker.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(icon: const Icon(Icons.edit), onPressed: _editTracker),
+          NotificationToggleButton(
+            tracker: tracker,
+            storage: _storage,
+            onChanged: () => setState(() {}),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          _buildStatsCard(),
+          Expanded(
+            child: sortedEntries.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    itemCount: sortedEntries.length,
+                    itemBuilder: (context, index) {
+                      return _buildEntryCard(sortedEntries[index]);
+                    },
+                  ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addEntry,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Entry'),
+      ),
+    );
+  }
+
+  // -----------------------------
+  // STATS CARD
+  // -----------------------------
+
+  Widget _buildStatsCard() {
+    final totalEntries = entries.length;
+
+    final lastEntry = entries.isNotEmpty
+        ? entries.reduce((a, b) => a.timestamp.isAfter(b.timestamp) ? a : b)
+        : null;
+
+    return Card(
+      margin: const EdgeInsets.all(16),
+      color: Theme.of(context).colorScheme.primaryContainer,
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+        child: Column(
+          children: [
+            Center(
+              child: Text(
+                tracker.question,
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatItem(
+                  icon: Icons.analytics,
+                  label: 'Total',
+                  value: totalEntries.toString(),
+                ),
+                _buildStatItem(
+                  icon: Icons.calendar_today,
+                  label: 'Last Entry',
+                  value: lastEntry != null
+                      ? _formatDate(lastEntry.timestamp)
+                      : 'Never',
+                ),
+                _buildStatItem(
+                  icon: Icons.repeat,
+                  label: 'Frequency',
+                  value: _getFrequencyText(tracker.schedule.frequency),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: 24),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[700])),
+      ],
+    );
+  }
+
+  // -----------------------------
+  // EMPTY STATE
+  // -----------------------------
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inbox, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 12),
+          Text(
+            'No entries yet',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Tap the button below to add your first entry',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // -----------------------------
+  // ENTRY CARD
+  // -----------------------------
+
+  Widget _buildEntryCard(Entry entry) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onLongPress: () => _showEntryOptions(entry),
+        child: ExpansionTile(
+          leading: CircleAvatar(
+            radius: 18,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            child: const Icon(Icons.check, color: Colors.white, size: 18),
+          ),
+          title: Text(
+            _formatDateTime(entry.timestamp),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          ),
+          subtitle: Text(
+            _getEntrySummary(entry),
+            style: const TextStyle(fontSize: 13),
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Column(
+                children: [
+                  ...entry.values.entries.map((e) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(e.key),
+                          Text(
+                            e.value.toString(),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -----------------------------
+  // ENTRY OPTIONS
+  // -----------------------------
+
+  void _showEntryOptions(Entry entry) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Edit Entry'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editEntry(entry);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Delete Entry'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteEntry(entry);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _editEntry(Entry entry) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            InputScreen(tracker: tracker, existingEntry: entry),
+      ),
+    ).then((_) => _reloadEntries());
+  }
+
+  Future<void> _deleteEntry(Entry entry) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Entry'),
+        content: const Text('Are you sure you want to delete this entry?'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          TextButton(
+            child: const Text('Delete'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      _storage.deleteEntry(entry);
+      _reloadEntries();
+    }
+  }
+
+  // -----------------------------
+  // HELPERS
+  // -----------------------------
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
+        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDate(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays == 0) return 'Today';
+    if (difference.inDays == 1) return 'Yesterday';
+    if (difference.inDays < 7) return '${difference.inDays} days ago';
+
+    return '${dateTime.month}/${dateTime.day}/${dateTime.year}';
+  }
+
+  String _getEntrySummary(Entry entry) {
+    if (entry.values.isEmpty) return 'No data';
+
+    final first = entry.values.entries.first;
+
+    if (entry.values.length == 1) {
+      return '${first.key}: ${first.value}';
+    }
+
+    return '${first.key}: ${first.value} (+${entry.values.length - 1} more)';
+  }
+
+  String _getFrequencyText(Frequency frequency) {
+    switch (frequency) {
+      case Frequency.daily:
+        return 'Daily';
+      case Frequency.weekly:
+        return 'Weekly';
+      case Frequency.monthly:
+        return 'Monthly';
+      case Frequency.custom:
+        return 'Custom';
+    }
+  }
+
+  void _reloadEntries() {
+    setState(() {
+      _loadEntries();
+    });
+  }
+  // -----------------------------
+  // ACTIONS
+  // -----------------------------
+
+  void _addEntry() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => InputScreen(tracker: tracker)),
+    ).then((_) => _reloadEntries());
+  }
+
+  void _editTracker() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateTrackerScreen(initialTracker: tracker),
+      ),
+    ).then((updated) {
+      if (updated != null && updated is Tracker) {
+        _storage.updateTracker(updated);
+        setState(() => tracker = updated);
+      }
+    });
+  }
+
+  void _toggleNotifications() {
+    final updated = tracker.copyWith(
+      notificationsEnabled: !tracker.notificationsEnabled,
+    );
+
+    _storage.updateTracker(updated);
+    setState(() => tracker = updated);
+
+    final ns = NotificationService();
+
+    if (!updated.notificationsEnabled) {
+      ns.cancelForNotificationID(updated.notificationId);
+    } else {
+      ns.scheduleForTracker(updated);
+    }
+  }
+}
+./services/in_app_reminder_service.dart
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../models/tracker.dart';
+import 'storage_service.dart';
+import 'notification/notification_service.dart';
+
+/// In-app reminder service: checks trackers every minute and shows a dialog
+/// when a reminder is due. This is a fallback for platforms without OS
+/// notification support (Linux / Web).
+class InAppReminderService {
+  static final InAppReminderService _instance =
+      InAppReminderService._internal();
+  factory InAppReminderService() => _instance;
+  InAppReminderService._internal();
+
+  Timer? _timer;
+  GlobalKey<NavigatorState>? _navigatorKey;
+
+  void start(GlobalKey<NavigatorState> navigatorKey) {
+    _navigatorKey = navigatorKey;
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) => _checkDue());
+  }
+
+  void stop() {
+    _timer?.cancel();
+    _timer = null;
+    _navigatorKey = null;
+  }
+
+  void _checkDue() {
+    final now = DateTime.now();
+    final storage = StorageService();
+    for (var t in storage.getAllTrackers()) {
+      final sched = t.schedule;
+      final parts = sched.time.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      if (sched.frequency == Frequency.daily) {
+        if (now.hour == hour && now.minute == minute) _showReminder(t);
+      } else if (sched.frequency == Frequency.weekly && sched.weekday != null) {
+        if (now.weekday == sched.weekday &&
+            now.hour == hour &&
+            now.minute == minute) {
+          _showReminder(t);
+        }
+      } else if (sched.frequency == Frequency.monthly &&
+          sched.dayOfMonth != null) {
+        if (now.day == sched.dayOfMonth &&
+            now.hour == hour &&
+            now.minute == minute) {
+          _showReminder(t);
+        }
+      }
+    }
+  }
+
+  void _showReminder(Tracker tracker) {
+    if (_navigatorKey == null) return;
+    final ctx = _navigatorKey!.currentState?.overlay?.context;
+    if (ctx == null) return;
+
+    // Try to use OS notifications when available. If that fails or the
+    // platform doesn't support notifications, fall back to an in-app dialog.
+    try {
+      // showNowForTracker will initialize the NotificationService if needed
+      // and show a system notification (appears in the tray).
+      NotificationService().showNowForTracker(tracker);
+      return;
+    } catch (_) {
+      // ignore and fall through to dialog fallback
+    }
+
+    showDialog(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        title: Text('Reminder: ${tracker.name}'),
+        content: Text(tracker.question),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+./services/storage_service.dart
+import '../models/tracker.dart';
+import 'notification/notification_service.dart';
+import '../models/entry.dart';
+
+/// Simple in-memory storage service for trackers and entries
+/// TODO: Replace with persistent storage (SQLite, Hive, etc.)
+class StorageService {
+  // Singleton pattern
+  static final StorageService _instance = StorageService._internal();
+  factory StorageService() => _instance;
+  StorageService._internal();
+
+  // In-memory storage
+  final List<Tracker> _trackers = [];
+  final List<Entry> _entries = [];
+
+  // Trackers
+  List<Tracker> getAllTrackers() => List.unmodifiable(_trackers);
+
+  Tracker? getTracker(String id) {
+    try {
+      return _trackers.firstWhere((t) => t.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  void addTracker(Tracker tracker) {
+    _trackers.add(tracker);
+    // schedule notification for this tracker if possible
+    try {
+      final ns = NotificationService();
+      ns.scheduleForTracker(tracker);
+    } catch (_) {}
+  }
+
+  void toggleNotifications(String trackerId) {
+    final tracker = getTracker(trackerId)!;
+
+    final updated = tracker.copyWith(
+      notificationsEnabled: !tracker.notificationsEnabled,
+    );
+
+    updateTracker(updated);
+  }
+
+  void updateTracker(Tracker tracker) {
+    final index = _trackers.indexWhere((t) => t.id == tracker.id);
+
+    if (index != -1) {
+      _trackers[index] = tracker;
+
+      try {
+        final ns = NotificationService();
+
+        ns.cancelForNotificationID(tracker.notificationId);
+
+        if (tracker.notificationsEnabled) {
+          ns.scheduleForTracker(tracker);
+        }
+      } catch (_) {}
+    }
+  }
+
+  void deleteTracker(String id) {
+    final tracker = _trackers.firstWhere(
+      (t) => t.id == id,
+      orElse: () => throw Exception("Tracker not found"),
+    );
+
+    _trackers.removeWhere((t) => t.id == id);
+
+    // Delete entries
+    _entries.removeWhere((e) => e.trackerId == id);
+
+    try {
+      final ns = NotificationService();
+      ns.cancelForNotificationID(tracker.notificationId);
+    } catch (_) {}
+  }
+
+  // Entries
+  List<Entry> getAllEntries() => List.unmodifiable(_entries);
+
+  List<Entry> getEntriesForTracker(String trackerId) {
+    return _entries.where((e) => e.trackerId == trackerId).toList();
+  }
+
+  Entry? getEntry(String trackerId, DateTime timestamp) {
+    try {
+      return _entries.firstWhere(
+        (e) => e.trackerId == trackerId && e.timestamp == timestamp,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  void addEntry(Entry entry) {
+    _entries.add(entry);
+  }
+
+  void updateEntry(Entry updatedEntry) {
+    final index = _entries.indexWhere((e) => e.id == updatedEntry.id);
+
+    if (index != -1) {
+      _entries[index] = updatedEntry;
+    }
+  }
+
+  void deleteEntry(Entry entry) {
+    _entries.removeWhere(
+      (e) => e.trackerId == entry.trackerId && e.timestamp == entry.timestamp,
+    );
+  }
+
+  // Utility methods
+  int getEntryCountForTracker(String trackerId) {
+    return _entries.where((e) => e.trackerId == trackerId).length;
+  }
+
+  Entry? getLatestEntryForTracker(String trackerId) {
+    final trackerEntries = getEntriesForTracker(trackerId);
+    if (trackerEntries.isEmpty) return null;
+
+    trackerEntries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return trackerEntries.first;
+  }
+
+  // Clear all data (useful for testing)
+  void clearAll() {
+    _trackers.clear();
+    _entries.clear();
+  }
+}
+./services/notification/notification_time_calculator.dart
+import 'package:timezone/timezone.dart' as tz;
+
+class NotificationTimeCalculator {
+  static tz.TZDateTime nextDaily(int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+
+    if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+
+    return scheduled;
+  }
+
+  static tz.TZDateTime nextWeekly(int weekday, int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+
+    while (scheduled.weekday != weekday) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+
+    if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 7));
+    }
+
+    return scheduled;
+  }
+
+  static tz.TZDateTime nextMonthly(int day, int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+
+    int lastDay = DateTime(now.year, now.month + 1, 0).day;
+
+    if (day > lastDay) {
+      day = lastDay;
+    }
+
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      day,
+      hour,
+      minute,
+    );
+
+    if (scheduled.isBefore(now)) {
+      final next = DateTime(now.year, now.month + 1, 1);
+
+      int nextLastDay = DateTime(next.year, next.month + 1, 0).day;
+
+      if (day > nextLastDay) {
+        day = nextLastDay;
+      }
+
+      scheduled = tz.TZDateTime(
+        tz.local,
+        next.year,
+        next.month,
+        day,
+        hour,
+        minute,
+      );
+    }
+
+    return scheduled;
+  }
+}
+./services/notification/notification_scheduler.dart
+import 'dart:io';
+import 'dart:async';
+
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+
+import '../../models/tracker.dart';
+import 'notification_time_calculator.dart';
+
+class NotificationScheduler {
+  late FlutterLocalNotificationsPlugin _plugin;
+  late NotificationDetails _details;
+
+  final Map<int, Timer> _linuxTimers = {};
+
+  void configure(
+    FlutterLocalNotificationsPlugin plugin,
+    NotificationDetails details,
+  ) {
+    _plugin = plugin;
+    _details = details;
+  }
+
+  Future<int> schedule(Tracker tracker) async {
+    final id = tracker.notificationId;
+
+    final parts = tracker.schedule.time.split(':');
+    final hour = int.parse(parts[0]);
+    final minute = int.parse(parts[1]);
+
+    tz.TZDateTime scheduled;
+    DateTimeComponents? repeat;
+
+    switch (tracker.schedule.frequency) {
+      case Frequency.daily:
+        scheduled = NotificationTimeCalculator.nextDaily(hour, minute);
+        repeat = DateTimeComponents.time;
+        break;
+      case Frequency.weekly:
+        scheduled = NotificationTimeCalculator.nextWeekly(
+          tracker.schedule.weekday!,
+          hour,
+          minute,
+        );
+        repeat = DateTimeComponents.dayOfWeekAndTime;
+        break;
+      case Frequency.monthly:
+        scheduled = NotificationTimeCalculator.nextMonthly(
+          tracker.schedule.dayOfMonth!,
+          hour,
+          minute,
+        );
+        break;
+      default:
+        // Unknown/custom frequency: no scheduling
+        return id;
+    }
+
+    if (Platform.isLinux) {
+      final delay = scheduled.toLocal().difference(DateTime.now());
+
+      _linuxTimers[id]?.cancel();
+
+      _linuxTimers[id] = Timer(
+        delay.isNegative ? Duration.zero : delay,
+        () async {
+          await _plugin.show(
+            id: id,
+            title: tracker.name,
+            body: tracker.question,
+            notificationDetails: _details,
+            payload: tracker.id,
+          );
+        },
+      );
+    } else {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: tracker.name,
+        body: tracker.question,
+        scheduledDate: scheduled,
+        notificationDetails: _details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: repeat,
+        payload: tracker.id,
+      );
+    }
+
+    return id;
+  }
+
+  Future<void> cancel(int id) async {
+    _linuxTimers.remove(id)?.cancel();
+    await _plugin.cancel(id: id);
+  }
+}
+./services/notification/notification_service.dart
+import 'dart:io';
+import 'dart:async';
+import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
+
+import '../../models/tracker.dart';
+import '../../services/storage_service.dart';
+import '../../screens/input_screen.dart';
+import 'package:flutter/material.dart';
+import '../../main.dart';
+import 'notification_scheduler.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+class NotificationService {
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
+  final NotificationScheduler _scheduler = NotificationScheduler();
+
+  bool _initialized = false;
+
+  static const _channelId = 'brilliant_channel';
+  static const _channelName = 'Reminders';
+
+  static const AndroidNotificationDetails _androidDetails =
+      AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        channelShowBadge: true,
+      );
+
+  static const NotificationDetails notificationDetails = NotificationDetails(
+    android: _androidDetails,
+    iOS: DarwinNotificationDetails(),
+    linux: LinuxNotificationDetails(),
+  );
+
+  bool get _supportedPlatform =>
+      !kIsWeb &&
+      (Platform.isAndroid ||
+          Platform.isIOS ||
+          Platform.isMacOS ||
+          Platform.isWindows ||
+          Platform.isLinux);
+
+  Future<void> init() async {
+    if (_initialized) return;
+
+    tz.initializeTimeZones();
+
+    try {
+      final tzInfo = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation((tzInfo as dynamic).identifier));
+    } catch (_) {
+      tz.setLocalLocation(tz.local);
+    }
+
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const ios = DarwinInitializationSettings();
+    const linux = LinuxInitializationSettings(defaultActionName: 'Open');
+
+    const settings = InitializationSettings(
+      android: android,
+      iOS: ios,
+      linux: linux,
+    );
+
+    await _plugin.initialize(
+      settings: settings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) async {
+        final payload = response.payload;
+        if (payload == null) return;
+        try {
+          final tracker = StorageService().getTracker(payload);
+          if (tracker != null) {
+            // Open the InputScreen directly so user can create an entry
+            navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (context) => InputScreen(tracker: tracker),
+              ),
+            );
+          }
+        } catch (_) {}
+      },
+    );
+
+    if (Platform.isAndroid) {
+      // Request Android 13+ runtime permission to post notifications
+      try {
+        await Permission.notification.request();
+      } catch (_) {}
+      const channel = AndroidNotificationChannel(
+        _channelId,
+        _channelName,
+        importance: Importance.defaultImportance,
+      );
+
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(channel);
+    }
+
+    if (Platform.isIOS) {
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >()
+          ?.requestPermissions(alert: true, badge: true, sound: true);
+    }
+
+    _scheduler.configure(_plugin, notificationDetails);
+
+    _initialized = true;
+  }
+
+  Future<int?> scheduleForTracker(Tracker tracker) async {
+    if (!_supportedPlatform) return null;
+    if (!_initialized) await init();
+
+    dev.log(
+      "scheduling ${tracker.notificationId}",
+      name: "NotificationService",
+    );
+    return _scheduler.schedule(tracker);
+  }
+
+  /// Show a notification immediately (testing helper). Payload is trackerId.
+  Future<void> showNowForTracker(Tracker tracker) async {
+    if (!_initialized) await init();
+    final id = tracker.notificationId;
+    await _plugin.show(
+      id: id,
+      title: 'Reminder: ${tracker.name}',
+      body: tracker.question,
+      notificationDetails: notificationDetails,
+      payload: tracker.id,
+    );
+  }
+
+  Future<void> cancelForNotificationID(int notificationId) async {
+    if (kIsWeb) return;
+    dev.log(
+      "Cancelling notification $notificationId",
+      name: "NotificationService",
+    );
+    await _scheduler.cancel(notificationId);
+  }
+}
+./models/tracker.dart
+import 'package:flutter/material.dart';
+import 'field.dart';
+
+enum Frequency {
+  daily,
+  weekly,
+  monthly,
+  custom, // For cron-like expressions
+}
+
+class Schedule {
+  final Frequency frequency;
+  final String time; // e.g., "08:00" for simple schedules
+  final String? cronExpression; // Optional: for custom/advanced scheduling
+  final int? weekday; // 1=Monday .. 7=Sunday for weekly schedules
+  final int? dayOfMonth; // 1..31 for monthly schedules
+
+  Schedule({
+    required this.frequency,
+    required this.time,
+    this.cronExpression,
+    this.weekday,
+    this.dayOfMonth,
+  });
+}
+
+class Tracker {
+  final String id;
+  final String name;
+  final String question;
+  final List<Field> fields;
+  final Schedule schedule;
+  final IconData? icon;
+  final bool notificationsEnabled;
+  final int notificationId;
+
+  Tracker({
+    required this.id,
+    required this.name,
+    required this.question,
+    required this.fields,
+    required this.schedule,
+    int? notificationId,
+    this.icon,
+    this.notificationsEnabled = true,
+  }) : notificationId = notificationId ?? id.hashCode & 0x7fffffff;
+
+  Tracker copyWith({
+    String? name,
+    String? question,
+    List<Field>? fields,
+    Schedule? schedule,
+    IconData? icon,
+    bool? notificationsEnabled,
+  }) {
+    return Tracker(
+      id: id,
+      name: name ?? this.name,
+      question: question ?? this.question,
+      fields: fields ?? this.fields,
+      schedule: schedule ?? this.schedule,
+      icon: icon ?? this.icon,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      notificationId: notificationId,
+    );
+  }
+}
+./models/entry.dart
+class Entry {
+  final String id;
+  final String trackerId;
+  final DateTime timestamp;
+  final Map<String, dynamic> values;
+
+  Entry({
+    required this.id,
+    required this.trackerId,
+    required this.timestamp,
+    required this.values,
+  });
+}
+./models/field.dart
+enum FieldType { integer, float, text, image }
+
+class Field {
+  final String name;
+  final FieldType type;
+
+  Field({required this.name, required this.type});
+}
+./widgets/global_app_bar.dart
+import 'package:flutter/material.dart';
+import '../main.dart';
+
+class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final Widget title;
+  final List<Widget>? actions;
+  final bool showHomeButton;
+
+  const GlobalAppBar({
+    super.key,
+    required this.title,
+    this.actions,
+    this.showHomeButton = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      leading: showHomeButton
+          ? Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Tooltip(
+                message: 'Home',
+                child: IconButton(
+                  icon: Image.asset(
+                    'assets/top_icon.png',
+                    width: 36,
+                    height: 36,
+                  ),
+                  onPressed: () {
+                    navigatorKey.currentState?.popUntil((r) => r.isFirst);
+                  },
+                ),
+              ),
+            )
+          : null,
+      title: title,
+      backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      actions: actions,
+    );
+  }
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+}
+./widgets/notification_toggle_button.dart
+import 'package:flutter/material.dart';
+
+import '../models/tracker.dart';
+import '../services/storage_service.dart';
+
+class NotificationToggleButton extends StatelessWidget {
+  final Tracker tracker;
+  final StorageService storage;
+  final VoidCallback onChanged;
+
+  const NotificationToggleButton({
+    super.key,
+    required this.tracker,
+    required this.storage,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(
+        tracker.notificationsEnabled
+            ? Icons.notifications
+            : Icons.notifications_off,
+      ),
+      color: tracker.notificationsEnabled
+          ? Theme.of(context).colorScheme.secondary
+          : Theme.of(context).colorScheme.primary,
+      tooltip: 'Toggle Notifications',
+      onPressed: () {
+        storage.toggleNotifications(tracker.id);
+        onChanged();
+      },
+    );
+  }
+}
+./main.dart
+import 'package:flutter/material.dart';
+import 'screens/home_screen.dart';
+import 'services/notification/notification_service.dart';
+import 'services/in_app_reminder_service.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialize notifications (will be no-op on unsupported platforms)
+  try {
+    await NotificationService().init();
+  } catch (_) {}
+
+  // Start in-app reminder service (fallback on platforms without OS notifications)
+  InAppReminderService().start(navigatorKey);
+
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      title: 'brilliant.track',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: const HomeScreen(),
+    );
+  }
+}
