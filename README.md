@@ -84,10 +84,16 @@ hello_world
 
 
 TODO:
-Fix Notification Function
-add persistence
-Make top bar better
-fix UI date access
-make edit field possible without hold
-make real logo
+Fix Notification Function .done
+fix UI date access .done
+make edit field possible without hold .done
+
+Must Have
+
+    add persistence
+
+NiceToHave
+    Make top bar better
+    make real logo
+
 ...

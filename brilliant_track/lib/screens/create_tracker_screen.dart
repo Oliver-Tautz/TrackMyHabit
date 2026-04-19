@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import '../models/tracker.dart';
-import '../models/field.dart';
+import '../data/app_database.dart';
 
 class CreateTrackerScreen extends StatefulWidget {
-  // When provided, the screen operates in "edit" mode and will prefill values.
   final Tracker? initialTracker;
 
   const CreateTrackerScreen({super.key, this.initialTracker});
@@ -17,8 +15,34 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
   final _nameController = TextEditingController();
   final _questionController = TextEditingController();
   final List<FieldData> _fields = [];
+
   Frequency _selectedFrequency = Frequency.daily;
   final _timeController = TextEditingController(text: '08:00');
+
+  IconData? _selectedIcon;
+  int? _selectedWeekday;
+  int? _selectedDayOfMonth;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final t = widget.initialTracker;
+    if (t != null) {
+      _nameController.text = t.name;
+      _questionController.text = t.question;
+      _selectedFrequency = t.schedule.frequency;
+      _timeController.text = t.schedule.time;
+      _selectedWeekday = t.schedule.weekday;
+      _selectedDayOfMonth = t.schedule.dayOfMonth;
+      _selectedIcon = t.icon;
+
+      _fields.clear();
+      for (final f in t.fields) {
+        _fields.add(FieldData(name: f.name, type: f.type));
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -28,25 +52,37 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
     super.dispose();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    final t = widget.initialTracker;
-    if (t != null) {
-      // Prefill form for edit
-      _nameController.text = t.name;
-      _questionController.text = t.question;
-      _selectedFrequency = t.schedule.frequency;
-      _timeController.text = t.schedule.time;
-      _fields.clear();
-      for (var f in t.fields) {
-        _fields.add(FieldData(name: f.name, type: f.type));
-      }
-      _selectedIcon = t.icon;
-    }
-  }
+  Future<void> _confirmDeleteTracker() async {
+    final tracker = widget.initialTracker;
+    if (tracker == null) return;
 
-  IconData? _selectedIcon;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Tracker'),
+          content: Text(
+            'This will delete "${tracker.name}" and all its entries. Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+    if (confirmed != true) return;
+
+    Navigator.pop(context, {'action': 'delete', 'trackerId': tracker.id});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +92,14 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
           widget.initialTracker == null ? 'Create New Tracker' : 'Edit Tracker',
         ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          if (widget.initialTracker != null)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              tooltip: 'Delete Tracker',
+              onPressed: _confirmDeleteTracker,
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -64,7 +108,6 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Tracker name
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -81,8 +124,6 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // Question
               TextFormField(
                 controller: _questionController,
                 decoration: const InputDecoration(
@@ -100,15 +141,10 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // Icon picker
               Text('Icon', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               _buildIconPicker(),
-
               const SizedBox(height: 24),
-
-              // Fields section
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -121,8 +157,6 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-
-              // Fields list
               if (_fields.isEmpty)
                 Card(
                   child: Padding(
@@ -150,14 +184,9 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                   final field = entry.value;
                   return _buildFieldCard(field, index);
                 }),
-
               const SizedBox(height: 24),
-
-              // Schedule section
               Text('Schedule', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-
-              // Frequency dropdown
               DropdownButtonFormField<Frequency>(
                 initialValue: _selectedFrequency,
                 decoration: const InputDecoration(
@@ -174,12 +203,16 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                 onChanged: (value) {
                   setState(() {
                     _selectedFrequency = value!;
+                    if (_selectedFrequency != Frequency.weekly) {
+                      _selectedWeekday = null;
+                    }
+                    if (_selectedFrequency != Frequency.monthly) {
+                      _selectedDayOfMonth = null;
+                    }
                   });
                 },
               ),
               const SizedBox(height: 16),
-
-              // Time input
               ListTile(
                 leading: const Icon(Icons.access_time),
                 title: const Text('Time'),
@@ -193,6 +226,7 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                       minute: int.parse(_timeController.text.split(':')[1]),
                     ),
                   );
+
                   if (timeOfDay != null) {
                     setState(() {
                       _timeController.text =
@@ -201,9 +235,7 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                   }
                 },
               ),
-
               const SizedBox(height: 16),
-              // Frequency-specific selectors
               if (_selectedFrequency == Frequency.weekly) ...[
                 Text(
                   'Day of week',
@@ -221,10 +253,7 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
                 _buildDayOfMonthSelector(),
                 const SizedBox(height: 16),
               ],
-
               const SizedBox(height: 32),
-
-              // Create/Save button
               ElevatedButton(
                 onPressed: _createTracker,
                 style: ElevatedButton.styleFrom(
@@ -307,7 +336,6 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
   }
 
   Widget _buildIconPicker() {
-    // Choose 10 material icons to present as options
     final icons = [
       Icons.insights,
       Icons.fitness_center,
@@ -355,19 +383,11 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
 
   Widget _buildWeekdaySelector() {
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    // ignore: unused_local_variable
-    int? selected = widget.initialTracker?.schedule.weekday;
-    if (_selectedFrequency == Frequency.weekly && _selectedIcon != null) {
-      // noop
-    }
 
     return Wrap(
       spacing: 8,
       children: List.generate(7, (i) {
-        final dayNumber = i + 1; // 1..7
-        // ignore: unused_local_variable
-        final isSelected =
-            (widget.initialTracker?.schedule.weekday == dayNumber) || (false);
+        final dayNumber = i + 1;
         return ChoiceChip(
           label: Text(days[i]),
           selected: _selectedWeekday == dayNumber,
@@ -392,9 +412,6 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
     );
   }
 
-  int? _selectedWeekday;
-  int? _selectedDayOfMonth;
-
   IconData _getFieldTypeIcon(FieldType type) {
     switch (type) {
       case FieldType.integer:
@@ -408,43 +425,48 @@ class _CreateTrackerScreenState extends State<CreateTrackerScreen> {
   }
 
   void _createTracker() {
-    if (_formKey.currentState!.validate()) {
-      if (_fields.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please add at least one field'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
+    if (!_formKey.currentState!.validate()) return;
 
-      final id =
-          widget.initialTracker?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString();
-
-      final tracker = Tracker(
-        id: id,
-        name: _nameController.text,
-        question: _questionController.text,
-        fields: _fields
-            .map((fd) => Field(name: fd.name, type: fd.type))
-            .toList(),
-        schedule: Schedule(
-          frequency: _selectedFrequency,
-          time: _timeController.text,
-          weekday: _selectedWeekday,
-          dayOfMonth: _selectedDayOfMonth,
+    if (_fields.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one field'),
+          backgroundColor: Colors.orange,
         ),
-        icon: _selectedIcon,
       );
-
-      Navigator.pop(context, tracker);
+      return;
     }
+
+    final id =
+        widget.initialTracker?.id ??
+        DateTime.now().millisecondsSinceEpoch.toString();
+
+    final tracker = Tracker(
+      id: id,
+      name: _nameController.text,
+      question: _questionController.text,
+      fields: _fields.map((fd) => Field(name: fd.name, type: fd.type)).toList(),
+      schedule: Schedule(
+        frequency: _selectedFrequency,
+        time: _timeController.text,
+        weekday: _selectedFrequency == Frequency.weekly
+            ? _selectedWeekday
+            : null,
+        dayOfMonth: _selectedFrequency == Frequency.monthly
+            ? _selectedDayOfMonth
+            : null,
+      ),
+      iconCodePoint: _selectedIcon?.codePoint,
+      sortOrder: widget.initialTracker?.sortOrder ?? 0,
+      notificationsEnabled: widget.initialTracker?.notificationsEnabled ?? true,
+      notificationId:
+          widget.initialTracker?.notificationId ?? (id.hashCode & 0x7fffffff),
+    );
+
+    Navigator.pop(context, tracker);
   }
 }
 
-// Helper class to store field data during creation
 class FieldData {
   final String name;
   final FieldType type;
@@ -452,7 +474,6 @@ class FieldData {
   FieldData({required this.name, required this.type});
 }
 
-// Dialog for adding a new field
 class _AddFieldDialog extends StatefulWidget {
   final Function(FieldData) onAdd;
 

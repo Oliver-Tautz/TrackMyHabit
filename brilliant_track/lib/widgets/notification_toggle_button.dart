@@ -1,6 +1,6 @@
+import 'package:brilliant_track/data/app_database.dart';
 import 'package:flutter/material.dart';
 
-import '../models/tracker.dart';
 import '../services/storage_service.dart';
 
 class NotificationToggleButton extends StatelessWidget {
@@ -27,8 +27,8 @@ class NotificationToggleButton extends StatelessWidget {
           ? Theme.of(context).colorScheme.secondary
           : Theme.of(context).colorScheme.primary,
       tooltip: 'Toggle Notifications',
-      onPressed: () {
-        storage.toggleNotifications(tracker.id);
+      onPressed: () async {
+        await storage.toggleNotifications(tracker.id);
         onChanged();
       },
     );

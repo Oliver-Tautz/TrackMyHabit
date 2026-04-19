@@ -7,7 +7,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 
-import '../../models/tracker.dart';
+import '../../data/app_database.dart';
 import '../../services/storage_service.dart';
 import '../../screens/input_screen.dart';
 import 'package:flutter/material.dart';
@@ -81,10 +81,10 @@ class NotificationService {
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         final payload = response.payload;
         if (payload == null) return;
+
         try {
-          final tracker = StorageService().getTracker(payload);
+          final tracker = await StorageService().getTracker(payload);
           if (tracker != null) {
-            // Open the InputScreen directly so user can create an entry
             navigatorKey.currentState?.push(
               MaterialPageRoute(
                 builder: (context) => InputScreen(tracker: tracker),

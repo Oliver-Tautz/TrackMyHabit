@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/tracker.dart';
-import '../models/field.dart';
-import '../models/entry.dart';
+import '../data/app_database.dart';
 import '../services/storage_service.dart';
 
 class InputScreen extends StatefulWidget {

@@ -1,10 +1,7 @@
 import 'package:brilliant_track/widgets/notification_toggle_button.dart';
 import 'package:flutter/material.dart';
-import '../models/tracker.dart';
-import '../models/field.dart';
-import '../models/entry.dart';
 import '../services/storage_service.dart';
-
+import '../data/app_database.dart';
 import 'create_tracker_screen.dart';
 import 'tracker_detail_screen.dart';
 import '../widgets/global_app_bar.dart';
@@ -28,72 +25,76 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _initializeSampleData() {
-    if (_storage.getAllTrackers().isEmpty) {
-      final now = DateTime.now();
+  Future<void> _initializeSampleData() async {
+    final trackers = await _storage.getAllTrackers();
+    if (trackers.isNotEmpty) return;
 
-      // ------------------------
-      // First tracker (existing)
-      // ------------------------
-      final sampleTracker = Tracker(
-        id: '1',
-        name: 'Weight Tracker',
-        question: 'What is your weight today?',
-        fields: [
-          Field(name: 'Weight', type: FieldType.float),
-          Field(name: 'Body Fat %', type: FieldType.float),
-        ],
-        schedule: Schedule(
-          frequency: Frequency.daily,
-          time:
-              '${now.hour.toString().padLeft(2, '0')}:${now.add(Duration(minutes: 1)).minute.toString().padLeft(2, '0')}',
-        ),
-      );
+    final now = DateTime.now();
 
-      _storage.addTracker(sampleTracker);
+    final sampleTracker = Tracker(
+      id: '1',
+      name: 'Weight Tracker',
+      question: 'What is your weight today?',
+      fields: [
+        Field(name: 'Weight', type: FieldType.float),
+        Field(name: 'Body Fat %', type: FieldType.float),
+      ],
+      schedule: Schedule(
+        frequency: Frequency.daily,
+        time:
+            '${now.hour.toString().padLeft(2, '0')}:${now.add(const Duration(minutes: 1)).minute.toString().padLeft(2, '0')}',
+      ),
+      notificationsEnabled: true,
+      notificationId: '1'.hashCode & 0x7fffffff,
+      sortOrder: 0,
+    );
 
-      _storage.addEntry(
-        Entry(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          trackerId: '1',
-          timestamp: now,
-          values: {'Weight': 70.5, 'Body Fat %': 18.2},
-        ),
-      );
+    await _storage.addTracker(sampleTracker);
 
-      // ------------------------
-      // Second tracker (NEW)
-      // ------------------------
-      final later = now.add(const Duration(minutes: 2));
+    await _storage.addEntry(
+      Entry(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        trackerId: '1',
+        timestamp: now,
+        values: {'Weight': 70.5, 'Body Fat %': 18.2},
+      ),
+    );
 
-      final hydrationTracker = Tracker(
-        id: '2',
-        name: 'Hydration Check',
-        question: 'Did you drink enough water?',
-        fields: [Field(name: 'Glasses', type: FieldType.integer)],
-        schedule: Schedule(
-          frequency: Frequency.daily,
-          time:
-              '${later.hour.toString().padLeft(2, '0')}:${later.minute.toString().padLeft(2, '0')}',
-        ),
-      );
+    final later = now.add(const Duration(minutes: 2));
 
-      _storage.addTracker(hydrationTracker);
+    final hydrationTracker = Tracker(
+      id: '2',
+      name: 'Hydration Check',
+      question: 'Did you drink enough water?',
+      fields: [Field(name: 'Glasses', type: FieldType.integer)],
+      schedule: Schedule(
+        frequency: Frequency.daily,
+        time:
+            '${later.hour.toString().padLeft(2, '0')}:${later.minute.toString().padLeft(2, '0')}',
+      ),
+      notificationsEnabled: true,
+      notificationId: '2'.hashCode & 0x7fffffff,
+      sortOrder: 1,
+    );
 
-      _storage.addEntry(
-        Entry(
-          id: (DateTime.now().millisecondsSinceEpoch + 1).toString(),
-          trackerId: '2',
-          timestamp: now,
-          values: {'Glasses': 5},
-        ),
-      );
+    await _storage.addTracker(hydrationTracker);
+
+    await _storage.addEntry(
+      Entry(
+        id: (DateTime.now().millisecondsSinceEpoch + 1).toString(),
+        trackerId: '2',
+        timestamp: now,
+        values: {'Glasses': 5},
+      ),
+    );
+
+    if (mounted) {
+      setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final trackers = _storage.getAllTrackers();
     return Scaffold(
       appBar: GlobalAppBar(
         title: const Text('brilliant.track'),
@@ -117,32 +118,48 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: trackers.isEmpty
-          ? _buildEmptyState()
-          : ReorderableListView.builder(
-              buildDefaultDragHandles: false,
-              proxyDecorator: (child, index, animation) {
-                return Material(
-                  elevation: 6,
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: double.infinity, // 👈 FORCE full width
-                    child: child,
-                  ),
-                );
-              },
-              padding: const EdgeInsets.all(16),
-              itemCount: trackers.length,
-              onReorder: _onReorder,
-              itemBuilder: (context, index) {
-                final tracker = trackers[index];
-                return _buildTrackerCard(
-                  tracker,
-                  index: index,
-                  key: ValueKey(tracker.id),
-                );
-              },
-            ),
+      body: FutureBuilder<List<Tracker>>(
+        future: _storage.getAllTrackers(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Error loading trackers: ${snapshot.error}'),
+            );
+          }
+
+          final trackers = snapshot.data ?? [];
+
+          if (trackers.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          return ReorderableListView.builder(
+            buildDefaultDragHandles: false,
+            proxyDecorator: (child, index, animation) {
+              return Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(width: double.infinity, child: child),
+              );
+            },
+            padding: const EdgeInsets.all(16),
+            itemCount: trackers.length,
+            onReorder: _onReorder,
+            itemBuilder: (context, index) {
+              final tracker = trackers[index];
+              return _buildTrackerCard(
+                tracker,
+                index: index,
+                key: ValueKey(tracker.id),
+              );
+            },
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _createNewTracker,
         icon: const Icon(Icons.add),
@@ -206,10 +223,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-
-        // 👇 FIXED TRAILING
         trailing: SizedBox(
-          height: 48, // ensures consistent tap area
+          height: 48,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -217,7 +232,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: NotificationToggleButton(
                   tracker: tracker,
                   storage: _storage,
-                  onChanged: () => setState(() {}),
+                  onChanged: () {
+                    if (!mounted) return;
+                    setState(() {});
+                  },
                 ),
               ),
               _buildIconWrapper(
@@ -237,28 +255,24 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-
         onTap: () => _viewTrackerDetails(tracker),
       ),
     );
   }
 
-  /// 👇 Helper to normalize size & padding
   Widget _buildIconWrapper({required Widget child}) {
     return SizedBox(width: 40, height: 40, child: Center(child: child));
   }
 
-  void _onReorder(int oldIndex, int newIndex) {
-    setState(() {
-      _storage.reorderTrackers(oldIndex, newIndex);
-    });
+  Future<void> _onReorder(int oldIndex, int newIndex) async {
+    await _storage.reorderTrackers(oldIndex, newIndex);
+    if (!mounted) return;
+    setState(() {});
   }
 
   String _buildTrackerSubtitle(Tracker tracker) {
     final frequency = _getFrequencyText(tracker.schedule.frequency);
-
     final time = tracker.schedule.time;
-
     return '${tracker.fields.length} fields • $frequency at $time';
   }
 
@@ -307,15 +321,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _viewTrackerDetails(Tracker tracker) {
-    // Get real entries from storage
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => TrackerDetailScreen(tracker: tracker),
       ),
     ).then((_) {
-      // Refresh the screen when returning
       setState(() {});
     });
   }
@@ -324,9 +335,9 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const CreateTrackerScreen()),
-    ).then((newTracker) {
+    ).then((newTracker) async {
       if (newTracker != null && newTracker is Tracker) {
-        _storage.addTracker(newTracker);
+        await _storage.addTracker(newTracker);
         if (mounted) setState(() {});
       }
     });
@@ -338,9 +349,19 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (context) => CreateTrackerScreen(initialTracker: tracker),
       ),
-    ).then((updatedTracker) {
-      if (updatedTracker != null && updatedTracker is Tracker) {
-        _storage.updateTracker(updatedTracker);
+    ).then((result) async {
+      if (result is Map && result['action'] == 'delete') {
+        await _storage.deleteTracker(result['trackerId'] as String);
+        if (!mounted) return;
+        setState(() {});
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${tracker.name} deleted')));
+        return;
+      }
+
+      if (result != null && result is Tracker) {
+        await _storage.updateTracker(result);
         if (mounted) {
           setState(() {});
           ScaffoldMessenger.of(
@@ -373,14 +394,16 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+
     if (!mounted) return;
     if (confirmed != true) return;
 
-    _storage.deleteTracker(tracker.id);
+    await _storage.deleteTracker(tracker.id);
+
+    if (!mounted) return;
 
     setState(() {});
 
-    // Optional: feedback
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('${tracker.name} deleted')));

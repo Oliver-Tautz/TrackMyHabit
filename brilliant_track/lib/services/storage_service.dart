@@ -1,142 +1,124 @@
-import '../models/tracker.dart';
+import '../data/app_database.dart';
 import 'notification/notification_service.dart';
-import '../models/entry.dart';
 
-/// Simple in-memory storage service for trackers and entries
-/// TODO: Replace with persistent storage (SQLite, Hive, etc.)
 class StorageService {
-  // Singleton pattern
   static final StorageService _instance = StorageService._internal();
   factory StorageService() => _instance;
   StorageService._internal();
 
-  // In-memory storage
-  final List<Tracker> _trackers = [];
-  final List<Entry> _entries = [];
+  final AppDatabase _db = AppDatabase();
 
-  // Trackers
-  List<Tracker> getAllTrackers() => List.unmodifiable(_trackers);
+  /// TRACKERS
 
-  Tracker? getTracker(String id) {
-    try {
-      return _trackers.firstWhere((t) => t.id == id);
-    } catch (e) {
-      return null;
-    }
+  Future<List<Tracker>> getAllTrackers() {
+    return _db.getAllTrackers();
   }
 
-  void addTracker(Tracker tracker) {
-    _trackers.add(tracker);
-    // schedule notification for this tracker if possible
+  Future<Tracker?> getTracker(String id) {
+    return _db.getTrackerById(id);
+  }
+
+  Future<void> addTracker(Tracker tracker) async {
+    final trackers = await _db.getAllTrackers();
+
+    final nextSortOrder = trackers.isEmpty
+        ? 0
+        : trackers.map((t) => t.sortOrder).reduce((a, b) => a > b ? a : b) + 1;
+
+    final trackerToInsert = tracker.copyWith(sortOrder: nextSortOrder);
+
+    await _db.insertTracker(trackerToInsert);
+
     try {
-      final ns = NotificationService();
-      ns.scheduleForTracker(tracker);
+      await NotificationService().scheduleForTracker(trackerToInsert);
     } catch (_) {}
   }
 
-  void toggleNotifications(String trackerId) {
-    final tracker = getTracker(trackerId)!;
+  Future<void> toggleNotifications(String trackerId) async {
+    final tracker = await getTracker(trackerId);
+    if (tracker == null) return;
 
     final updated = tracker.copyWith(
       notificationsEnabled: !tracker.notificationsEnabled,
     );
 
-    updateTracker(updated);
+    await updateTracker(updated);
   }
 
-  void updateTracker(Tracker tracker) {
-    final index = _trackers.indexWhere((t) => t.id == tracker.id);
-
-    if (index != -1) {
-      _trackers[index] = tracker;
-
-      try {
-        final ns = NotificationService();
-
-        ns.cancelForNotificationID(tracker.notificationId);
-
-        if (tracker.notificationsEnabled) {
-          ns.scheduleForTracker(tracker);
-        }
-      } catch (_) {}
-    }
-  }
-
-  void deleteTracker(String id) {
-    final tracker = _trackers.firstWhere(
-      (t) => t.id == id,
-      orElse: () => throw Exception("Tracker not found"),
-    );
-
-    _trackers.removeWhere((t) => t.id == id);
-
-    // Delete entries
-    _entries.removeWhere((e) => e.trackerId == id);
+  Future<void> updateTracker(Tracker tracker) async {
+    await _db.updateTracker(tracker);
 
     try {
       final ns = NotificationService();
-      ns.cancelForNotificationID(tracker.notificationId);
+
+      await ns.cancelForNotificationID(tracker.notificationId);
+
+      if (tracker.notificationsEnabled) {
+        await ns.scheduleForTracker(tracker);
+      }
     } catch (_) {}
   }
 
-  // Entries
-  List<Entry> getAllEntries() => List.unmodifiable(_entries);
+  Future<void> deleteTracker(String id) async {
+    final tracker = await getTracker(id);
+    if (tracker == null) return;
 
-  List<Entry> getEntriesForTracker(String trackerId) {
-    return _entries.where((e) => e.trackerId == trackerId).toList();
-  }
+    await _db.deleteTracker(id);
 
-  Entry? getEntry(String trackerId, DateTime timestamp) {
     try {
-      return _entries.firstWhere(
-        (e) => e.trackerId == trackerId && e.timestamp == timestamp,
+      await NotificationService().cancelForNotificationID(
+        tracker.notificationId,
       );
-    } catch (e) {
-      return null;
+    } catch (_) {}
+  }
+
+  Future<void> reorderTrackers(int oldIndex, int newIndex) async {
+    final trackers = await _db.getAllTrackers();
+
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
+    }
+
+    final movedTracker = trackers.removeAt(oldIndex);
+    trackers.insert(newIndex, movedTracker);
+
+    for (int i = 0; i < trackers.length; i++) {
+      final tracker = trackers[i];
+
+      if (tracker.sortOrder != i) {
+        await _db.updateTracker(tracker.copyWith(sortOrder: i));
+      }
     }
   }
 
-  void addEntry(Entry entry) {
-    _entries.add(entry);
+  /// ENTRIES
+
+  Future<List<Entry>> getEntriesForTracker(String trackerId) {
+    return _db.getEntriesForTracker(trackerId);
   }
 
-  void updateEntry(Entry updatedEntry) {
-    final index = _entries.indexWhere((e) => e.id == updatedEntry.id);
-
-    if (index != -1) {
-      _entries[index] = updatedEntry;
-    }
+  Future<void> addEntry(Entry entry) {
+    return _db.insertEntry(entry);
   }
 
-  void deleteEntry(Entry entry) {
-    _entries.removeWhere(
-      (e) => e.trackerId == entry.trackerId && e.timestamp == entry.timestamp,
-    );
+  Future<void> updateEntry(Entry entry) {
+    return _db.updateEntry(entry);
   }
 
-  // Utility methods
-  int getEntryCountForTracker(String trackerId) {
-    return _entries.where((e) => e.trackerId == trackerId).length;
+  Future<void> deleteEntry(String id) {
+    return _db.deleteEntry(id);
   }
 
-  Entry? getLatestEntryForTracker(String trackerId) {
-    final trackerEntries = getEntriesForTracker(trackerId);
-    if (trackerEntries.isEmpty) return null;
-
-    trackerEntries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return trackerEntries.first;
+  Future<int> getEntryCountForTracker(String trackerId) async {
+    final entries = await getEntriesForTracker(trackerId);
+    return entries.length;
   }
 
-  void reorderTrackers(int oldIndex, int newIndex) {
-    if (newIndex > oldIndex) newIndex -= 1;
+  Future<Entry?> getLatestEntryForTracker(String trackerId) async {
+    final entries = await getEntriesForTracker(trackerId);
+    if (entries.isEmpty) return null;
 
-    final item = _trackers.removeAt(oldIndex);
-    _trackers.insert(newIndex, item);
-  }
-
-  // Clear all data (useful for testing)
-  void clearAll() {
-    _trackers.clear();
-    _entries.clear();
+    entries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return entries.first;
   }
 }

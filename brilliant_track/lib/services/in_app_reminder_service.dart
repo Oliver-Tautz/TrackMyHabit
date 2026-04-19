@@ -1,8 +1,8 @@
 import 'dart:async';
 
+import 'package:brilliant_track/data/app_database.dart';
 import 'package:flutter/material.dart';
 
-import '../models/tracker.dart';
 import 'storage_service.dart';
 import 'notification/notification_service.dart';
 
@@ -30,10 +30,10 @@ class InAppReminderService {
     _navigatorKey = null;
   }
 
-  void _checkDue() {
+  Future<void> _checkDue() async {
     final now = DateTime.now();
     final storage = StorageService();
-    for (var t in storage.getAllTrackers()) {
+    for (var t in await storage.getAllTrackers()) {
       if (!t.notificationsEnabled) continue;
       final sched = t.schedule;
       final parts = sched.time.split(':');

@@ -3,8 +3,7 @@ import 'dart:async';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
-
-import '../../models/tracker.dart';
+import '../../data/app_database.dart';
 import 'notification_time_calculator.dart';
 
 class NotificationScheduler {

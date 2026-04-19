@@ -1,11 +1,10 @@
 import 'package:brilliant_track/widgets/notification_toggle_button.dart';
 import 'package:flutter/material.dart';
-import '../models/tracker.dart';
-import '../models/entry.dart';
 import '../services/storage_service.dart';
 import 'input_screen.dart';
 import 'create_tracker_screen.dart';
 import '../widgets/global_app_bar.dart';
+import '../data/app_database.dart';
 
 class TrackerDetailScreen extends StatefulWidget {
   final Tracker tracker;
@@ -20,6 +19,7 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
   final _storage = StorageService();
   late Tracker tracker;
   List<Entry> entries = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -28,8 +28,14 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     _loadEntries();
   }
 
-  void _loadEntries() {
-    entries = _storage.getEntriesForTracker(tracker.id);
+  Future<void> _loadEntries() async {
+    final loadedEntries = await _storage.getEntriesForTracker(tracker.id);
+    if (!mounted) return;
+
+    setState(() {
+      entries = loadedEntries;
+      _isLoading = false;
+    });
   }
 
   @override
@@ -65,36 +71,38 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
           NotificationToggleButton(
             tracker: tracker,
             storage: _storage,
-            onChanged: () {
+            onChanged: () async {
+              final updated = await _storage.getTracker(tracker.id);
+              if (!mounted || updated == null) return;
+
               setState(() {
-                final updated = _storage.getTracker(tracker.id);
-                if (updated != null) {
-                  tracker = updated;
-                }
+                tracker = updated;
               });
             },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildStatsCard(),
-          Expanded(
-            child: sortedEntries.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    itemCount: sortedEntries.length,
-                    itemBuilder: (context, index) {
-                      return _buildEntryCard(sortedEntries[index]);
-                    },
-                  ),
-          ),
-        ],
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                _buildStatsCard(),
+                Expanded(
+                  child: sortedEntries.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          itemCount: sortedEntries.length,
+                          itemBuilder: (context, index) {
+                            return _buildEntryCard(sortedEntries[index]);
+                          },
+                        ),
+                ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addEntry,
         icon: const Icon(Icons.add),
@@ -102,10 +110,6 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
       ),
     );
   }
-
-  // -----------------------------
-  // STATS CARD
-  // -----------------------------
 
   Widget _buildStatsCard() {
     final totalEntries = entries.length;
@@ -178,10 +182,6 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     );
   }
 
-  // -----------------------------
-  // EMPTY STATE
-  // -----------------------------
-
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -202,10 +202,6 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
       ),
     );
   }
-
-  // -----------------------------
-  // ENTRY CARD
-  // -----------------------------
 
   Widget _buildEntryCard(Entry entry) {
     return Card(
@@ -261,10 +257,6 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     );
   }
 
-  // -----------------------------
-  // ENTRY OPTIONS
-  // -----------------------------
-
   void _showEntryOptions(Entry entry) {
     showModalBottomSheet(
       context: context,
@@ -318,14 +310,10 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     );
 
     if (confirm == true) {
-      _storage.deleteEntry(entry);
-      _reloadEntries();
+      await _storage.deleteEntry(entry.id);
+      await _reloadEntries();
     }
   }
-
-  // -----------------------------
-  // HELPERS
-  // -----------------------------
 
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
@@ -368,14 +356,9 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
     }
   }
 
-  void _reloadEntries() {
-    setState(() {
-      _loadEntries();
-    });
+  Future<void> _reloadEntries() async {
+    await _loadEntries();
   }
-  // -----------------------------
-  // ACTIONS
-  // -----------------------------
 
   void _addEntry() {
     Navigator.push(
@@ -390,9 +373,10 @@ class _TrackerDetailScreenState extends State<TrackerDetailScreen> {
       MaterialPageRoute(
         builder: (context) => CreateTrackerScreen(initialTracker: tracker),
       ),
-    ).then((updated) {
+    ).then((updated) async {
       if (updated != null && updated is Tracker) {
-        _storage.updateTracker(updated);
+        await _storage.updateTracker(updated);
+        if (!mounted) return;
         setState(() => tracker = updated);
       }
     });
