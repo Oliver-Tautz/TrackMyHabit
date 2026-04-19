@@ -1,4 +1,4 @@
-name: Android Release APK
+name: Android and Linux Release
 
 on:
   push:
@@ -9,7 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build-apk:
+  build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -41,13 +42,74 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release --no-tree-shake-icons
 
+      - name: Rename APK
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/brilliant-track-${{ github.ref_name }}.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: brilliant_track/build/app/outputs/flutter-apk/app-release.apk
+          name: android-apk-${{ github.ref_name }}
+          path:
+            brilliant_track/build/app/outputs/flutter-apk/brilliant-track-${{
+            github.ref_name }}.apk
 
       - name: Attach APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: brilliant_track/build/app/outputs/flutter-apk/app-release.apk
+          files:
+            brilliant_track/build/app/outputs/flutter-apk/brilliant-track-${{
+            github.ref_name }}.apk
+
+  build-linux:
+    name: Build Linux bundle
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: brilliant_track
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read Flutter version
+        id: flutter_version
+        run: echo "version=$(jq -r .flutter .fvmrc)" >> $GITHUB_OUTPUT
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.flutter_version.outputs.version }}
+          cache: true
+
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Linux release
+        run: flutter build linux --release
+
+      - name: Archive Linux bundle
+        run: |
+          tar -czf brilliant-track-linux-${{ github.ref_name }}.tar.gz \
+            -C build/linux/x64/release bundle
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundle-${{ github.ref_name }}
+          path: brilliant_track/brilliant-track-linux-${{ github.ref_name }}.tar.gz
+
+      - name: Attach Linux bundle to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: brilliant_track/brilliant-track-linux-${{ github.ref_name }}.tar.gz
