@@ -83,10 +83,6 @@ hello_world
 ```
 
 
-TODO:
-Fix Notification Function .done
-fix UI date access .done
-make edit field possible without hold .done
 
 Must Have
 
