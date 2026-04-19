@@ -1,0 +1,47 @@
+name: Android Release APK
+
+on:
+    push:
+        tags:
+            - "v*"
+
+jobs:
+    build-apk:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Read Flutter version
+              id: flutter_version
+              run: echo "version=$(jq -r .flutter .fvmrc)" >> $GITHUB_OUTPUT
+
+            - name: Set up Java
+              uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: "17"
+
+            - name: Set up Flutter
+              uses: subosito/flutter-action@v2
+              with:
+                  flutter-version: ${{ steps.flutter_version.outputs.version }}
+                  cache: true
+
+            - name: Install dependencies
+              run: flutter pub get
+
+            - name: Build release APK
+              run: flutter build apk --release --no-tree-shake-icons
+
+            - name: Upload APK artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: app-release-apk
+                  path: build/app/outputs/flutter-apk/app-release.apk
+
+            - name: Attach APK to GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  files: build/app/outputs/flutter-apk/app-release.apk
