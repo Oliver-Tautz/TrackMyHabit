@@ -90,10 +90,15 @@ make edit field possible without hold .done
 
 Must Have
 
-    add persistence
+
 
 NiceToHave
+    UI Upgrade:
+        Better Icons
+        Home Screen better updating
+
     Make top bar better
     make real logo
+    Add Tests
 
 ...
